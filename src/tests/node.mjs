@@ -2,6 +2,7 @@
    The browser runner in tests.html executes the same suite file. */
 import { runAll } from './harness.js';
 import './engines.test.js';
+import './phases.test.js';
 
 const { results, passed, failed, total } = await runAll();
 

@@ -1,168 +1,287 @@
 # NoMeh!
 
-A private, offline-first personal performance app. Everything is stored in your browser, on your device. No account, no server, no subscription, no telemetry.
+A privacy-first, offline-first personal performance tracker. Nutrition, training,
+running and cycling, recovery, body composition, and analytics — all stored in
+your browser, on your device, with no account and no server.
 
-**This repository is the deployed app.** There is no build step. Drop these files into a GitHub repository, turn on Pages, and it runs.
-
----
-
-## Read this first: what is and is not built
-
-The specification describes 44 subsystems — nutrition databases, GPS tracking, cycling power estimation, anatomical SVG selectors, WebAuthn vaults, timelapse photo pipelines. Its own implementation strategy divides that into eight phases and says, in bold terms: *do not attempt to build every feature simultaneously, build in vertical slices, build the data model first.*
-
-**This is Phase 1, built properly, end to end.** Nothing is stubbed, mocked, or faked. Every button in the app does what it says.
-
-| Built and working | Declared but empty | Not built |
-|---|---|---|
-| Versioned Dexie schema (all 30+ domain tables) | Nutrition, workout, GPS, sleep, photo tables | Food database & Open Food Facts |
-| Repository layer with soft delete, restore, audit trail | | Barcode scanning |
-| Bio-math engine (BMI, BMR, TDEE, macros, hydration, sweat rate) | | GPS tracking & live HUD |
-| Universal LOG — 17 record types, all editable/undoable | | Anatomical SVG selector |
-| Natural-language quick-log parser with confirm-before-save | | Training programs & progression |
-| Today dashboard, Universal Timeline, Body progression, Goals | | Recovery scoring model |
-| Backup: JSON export/import with validation & duplicate detection | | Progress photos & Ghost Viewfinder |
-| CSV log export, GPX exporter | | Web Bluetooth sensors |
-| Storage dashboard, privacy dashboard, capability matrix | | Encrypted vault / WebAuthn |
-| Trash with restore, tiered destructive confirmations | | Charts beyond the weight sparkline |
-| Service worker, offline shell, update flow, PWA install | | |
-| 64 automated tests, runnable in-browser and headless | | |
-
-Where a feature is absent, the app **says so on the screen where you would look for it** — see the Progress photos card in Body. It does not show an empty chart and hope you don't notice.
-
-The one place this is most visible is **Readiness on the Today screen**. The spec asks for a readiness engine over sleep, HRV, resting HR, training load, RPE and soreness. With two data points, any score would be noise dressed as insight — and you would reasonably train hard on the strength of a green badge. So it shows you which inputs exist, which are missing, and refuses to produce a number until it has a baseline.
+There is no backend. There is nothing to sign up for. Nothing you log leaves the
+device unless you export it yourself.
 
 ---
 
-## Cautious reading of the spec: 11 things worth knowing before you build further
+## Deploying to GitHub Pages
 
-The two documents are consistent with each other — `polromt.docx` is the build prompt for `NoMeh!_Complete_Product_&_UX.docx`, and I found no contradictions between them. What I did find are places where the spec asks for something the web platform cannot actually deliver as described. Since the spec itself says *do not fabricate unsupported browser capabilities* and *do not pretend iOS Safari supports APIs it does not reliably support*, these are flagged rather than quietly implemented as illusions.
+No build step. No `npm install`. The files in this repository *are* the app.
 
-**1. iOS storage eviction is the single biggest risk to this product.** A local-first app with no cloud has exactly one copy of the user's data. Safari can clear IndexedDB after roughly seven days of no use for sites that are not installed to the Home Screen. `navigator.storage.persist()` — the API that asks for protection — is largely Chromium-only. Mitigation in this build: the capability matrix says so explicitly, Settings offers the persist request where available, and there is a backup nudge that escalates when an export is overdue. There is no technical fix; only honesty and backup discipline.
+1. Create a repository and upload every file, keeping the folder structure.
+2. **Settings → Pages → Source: Deploy from a branch**, pick `main` and `/ (root)`.
+3. Wait a minute, then open `https://<you>.github.io/<repo>/`.
 
-**2. Background GPS in a browser is not reliable, and no amount of engineering changes that.** iOS suspends JavaScript when the screen locks. Wake Lock helps on Chromium but is patchy on iOS. A user who starts a run, pockets the phone and locks the screen will get a truncated route. The realistic architecture is: foreground tracking with the screen awake, plus a first-class GPX import path for watch data. Building a "background tracking" toggle would be the fake implementation the spec forbids.
+It works from a subpath — every asset reference is relative, the manifest uses
+`"./"` for `start_url` and `scope`, and routing is hash-based (`#/today`), which
+is the only form that survives a hard refresh on Pages without server rewrite
+rules. `404.html` catches path-style URLs and redirects them into the router.
 
-**3. Web Bluetooth does not exist on iOS.** Not in Safari, and not in Chrome for iOS either, since all iOS browsers use WebKit. Heart-rate straps, cadence sensors and power meters are Chromium/Android-only. The spec's cycling power and FTP features are therefore Android-first by necessity.
+**On every subsequent deploy, bump `CACHE_VERSION` in `sw.js`.** The service
+worker serves the shell from cache; without a bump, returning visitors keep the
+old JavaScript against your new HTML. It is currently `v2.0.0`.
 
-**4. There is no web API for Apple Health or Google Fit.** "Health integrations" can only mean file import — an Apple Health export XML, a Google Takeout archive, a Garmin/Strava export. Not live sync. This changes the feature's shape substantially and is worth deciding early.
+### Installing it on a phone
 
-**5. Battery Status API is unavailable in Safari and Firefox.** §26's battery-aware GPS sampling works on Chromium only. Everywhere else, low-battery warnings during long sessions are impossible.
+- **Android/Chrome** — the browser offers "Install app", or use ⋮ → Add to Home screen.
+- **iOS/Safari** — Share → Add to Home Screen. **Do this.** iOS deletes IndexedDB
+  for sites unvisited for seven days, and installing to the Home Screen is what
+  exempts you. Uninstalled, on iOS, your data has a one-week fuse.
 
-**6. WebAuthn authenticates; it does not encrypt.** A passkey can gate access to the app, but deriving an encryption key from it requires the PRF extension, which has limited support. The practical design for §31's "encrypted NoMeh backup" is a passphrase run through WebCrypto PBKDF2, with the passkey as a convenience unlock on top. The spec is already right that client-side protection is not equivalent to a hardened server — worth keeping that framing in the UI.
-
-**7. Notifications on iOS require Home Screen installation** (iOS 16.4+). A reminder system that silently does nothing for uninstalled iOS users is worse than one that explains the prerequisite.
-
-**8. Barcode scanning splits by engine.** `BarcodeDetector` is Chromium-only. Everywhere else needs a WASM decoder (ZXing or similar), which is a real bundle-size decision — lazy-load it, don't ship it in the shell.
-
-**9. Weather data and the no-API-keys rule collide.** §34's environmental context needs a weather provider, and most require a key, which cannot go in client-side code. Open-Meteo is keyless and CORS-friendly — that is the answer to this constraint.
-
-**10. Open Food Facts is usable but has caveats.** Keyless and CORS-enabled, but it asks clients to identify themselves via User-Agent, which browsers will not let you set. Rate limits apply. Cache aggressively and always keep the local food database as the primary path, exactly as §8 requires.
-
-**11. Routing had to be hash-based.** GitHub Pages serves static files with no rewrite rules, so History-API routing 404s on refresh at `/REPO/today`. Hash routes (`#/today`) survive a hard refresh, a shared link and a cold start from the Home Screen with zero server configuration. A `404.html` fallback catches hand-typed path-style URLs.
-
----
-
-## Deploy it (browser only — no terminal, no Node, no build)
-
-1. Create a new GitHub repository, e.g. `nomeh`.
-2. On the repository page choose **Add file → Upload files**, then drag the entire contents of this folder in. GitHub's web uploader accepts nested folders, so `src/`, `styles/` and `assets/` come across intact.
-3. Commit.
-4. **Settings → Pages → Source: Deploy from a branch → `main` / `(root)` → Save.**
-5. Wait about a minute. The app is live at `https://YOUR-NAME.github.io/nomeh/`.
-6. Open it on your phone and install it (Share → Add to Home Screen on iOS; the install icon in the address bar on Android/desktop).
-
-Nothing needs editing for a different repository name — every path in the app is relative.
-
-**After each deploy, bump `CACHE_VERSION` in `sw.js`.** Otherwise returning visitors keep the previously cached shell. It is the only manual step in the release process.
-
-### Optional: run the tests
-
-- **In a browser:** open `tests.html` on the deployed site. It runs on the actual device, so a browser-specific difference in number or date handling shows up there rather than in your data.
-- **Headless:** `npm test` (Node 18+, no dependencies to install). `package.json` exists only for this; the app itself does not use it.
+Either way: export a backup regularly. Settings → Backup.
 
 ---
 
-## Architecture
+## Changing colours and constants
+
+There are two configuration files, and between them they hold every value in the
+app that is a judgement call rather than a law of physics.
+
+### `src/config/theme.js` — everything visual
+
+Three ways to recolour, in increasing order of effort:
+
+**1. Pick a different preset.** Change one line:
+
+```js
+export const ACTIVE_PRESET = 'ember';   // void | ember | deep | moss | paper | contrast
+```
+
+`paper` is a light theme. `contrast` is maximum-legibility: pure black, no blur.
+
+**2. Edit the palette directly.** In `DEFAULT_THEME.palette`:
+
+```js
+performance: '#00e08a',  // activity, streaks, anything "on track"
+nutrition:   '#ffb020',  // food, calories, macros
+strength:    '#7c5cff',  // resistance training, PRs
+recovery:    '#38d6ff',  // hydration, sleep, readiness
+alert:       '#ff3b5c',  // warnings, peak heart-rate zones
+```
+
+Those five carry *meaning*. Swap the hues freely, but keep each meaning attached
+to its key or the app's colour language stops parsing. Everything else —
+surfaces, borders, text, glass — is in the same object.
+
+**3. From inside the app.** Settings → Appearance lists every preset, and "Edit
+colours" gives you a colour picker per hue that saves to the database. Good for
+trying things on one device without touching code.
+
+Also parameterised in the same file: fonts (including `fonts.remote: false` to
+drop the Google Fonts request entirely and use system fonts), the spacing scale,
+corner radii, blur strength, tint opacity, dock height, and animation timings.
+
+Nothing in `styles/*.css` needs editing to recolour. The stylesheets read CSS
+custom properties, and `theme.js` writes them at boot. `styles/tokens.css` holds
+the same defaults so the first paint is correct before JavaScript runs — if you
+change a default in one place, change it in both, or just use a preset.
+
+### `src/config/app.config.js` — everything behavioural
+
+The rule this file enforces: **no magic numbers anywhere else in the codebase.**
+Every entry has a comment explaining what changes when you change it.
+
+| Section | Controls |
+|---|---|
+| `FEATURES` | 17 master switches. Turning one off removes its screens, its dock tab, and its background work. |
+| `PHYSIOLOGY` | Activity factors, goal definitions, calorie floors, macro splits, hydration rates, heart-rate zones, BMI bands. |
+| `TRAINING` | 1RM formula, rest periods, progression rules, load-model windows, spike threshold. |
+| `GPS` | Accuracy gate, movement threshold, speed sanity limit, smoothing, elevation noise floor, split distance. |
+| `ANALYTICS` | Trend windows, chart ranges, sufficiency thresholds, correlation minimums. |
+| `READINESS` | Input weights, minimum inputs before a score is shown, score bands. |
+| `NUTRITION` | Meal slots, kcal per gram, search behaviour, cache lifetime, sanity tolerance. |
+| `PHOTOS` | Resize dimensions, quality, format, poses, ghost opacity, storage warning. |
+| `SECURITY` | PBKDF2 iterations, cipher, minimum passphrase length. |
+| `PARSER` | Quick-log vocabulary — add your own words here rather than editing the parser. |
+| `UI` | Navigation order, page sizes, toast timings, confirmation phrases. |
+| `SAFETY` | The guardrails, as auditable switches rather than buried prose. |
+
+This is not a decorative config file. `biomath.js` was rewired to read from it —
+there is no longer a single hard-coded physiological constant in the engines, and
+the test suite passes against the config-derived values.
+
+**Example — make it a lifting-only app:**
+
+```js
+export const FEATURES = {
+  nutrition: false, hydration: false, endurance: false, gps: false,
+  strength: true, recovery: true, /* ... */
+};
+```
+
+The Diary and Runs tabs disappear entirely. Nothing is left half-visible.
+
+---
+
+## What is actually built
+
+Honest accounting. Not everything is equally finished.
+
+### Production quality — built, tested, and I would rely on it
+
+| Area | Notes |
+|---|---|
+| **Shell, routing, PWA, offline** | Hash router, service worker, install prompts, capability detection. |
+| **Data layer** | Dexie/IndexedDB, schema v3, real migrations, repository layer, soft delete, audit trail, timezone-aware date keys. |
+| **Parameterisation** | Both config files, the runtime theme picker, per-colour overrides. |
+| **Bio-math engine** | Mifflin-St Jeor, TDEE, macro targets with a hard calorie floor, hydration, unit conversion. |
+| **Universal quick-log** | 17 log types, 9 matchers, confidence scoring, nothing written without confirmation. |
+| **Nutrition** | Food database, per-100g normalisation, portions, meal slots, macro reconciliation, recipes, Open Food Facts with 30-day caching, barcode scanning where supported. |
+| **Training** | 1RM across three formulas, PR detection, progression suggestions, rest timer that survives screen lock, live session writes, 60 seeded exercises, 4 programmes. |
+| **GPS / endurance** | Full filter pipeline, live HUD, wake lock, splits, moving time, elevation, route rendering, GPX import **and** export. |
+| **Recovery** | Sleep analysis, readiness with a genuine refusal state, ATL/CTL training load, correlations. |
+| **Charts** | Hand-rolled SVG: line, bar, stacked, sparkline. Gaps render as gaps, never as zeros. |
+| **Encrypted backup** | PBKDF2 + AES-GCM, self-describing header, distinguishes a wrong passphrase from a damaged file. |
+| **Test suite** | 208 tests over every pure engine. `npm test`, or open `tests.html`. |
+
+### Thinner — works, but less polished than the above
+
+- **Progress photos.** Capture, ghost-overlay alignment, resizing, timelapse, and
+  storage accounting all work. The gallery is functional rather than beautiful,
+  and there is no side-by-side comparison view yet.
+- **Analytics screen.** The charts are solid; the screen is a stack of cards
+  rather than a designed dashboard. No custom date ranges beyond the four presets.
+- **Health import.** Apple Health XML, Strava CSV and Google Takeout CSV all
+  parse and import correctly, including chunked reading so a 500 MB export does
+  not exhaust memory. But large Apple exports are slow and may only complete on
+  a desktop browser, and only a subset of Apple's record types is recognised.
+- **Programmes.** You can start a session from a template, but the app does not
+  yet walk you through the prescribed sets — it opens a free session and leaves
+  you to follow the plan.
+
+### Not built
+
+- Recipes have an engine and storage but no dedicated management screen; they are
+  reachable only through the diary.
+- Grocery list, leftovers tracking, and bike maintenance logging have tables in
+  the schema but no UI.
+- Achievements beyond PR detection.
+- No automated tests for the database, migration, or backup-restore paths. Those
+  need a real IndexedDB, which means a browser driver. **This is the largest gap
+  in the test coverage and I would rather say so than ship tests that only look
+  like coverage.**
+
+---
+
+## Platform limits you should know about
+
+These are constraints of the web platform, not shortcuts. The app states each one
+in context rather than failing mysteriously.
+
+- **iOS deletes IndexedDB after 7 days of not visiting**, unless the app is
+  installed to the Home Screen. This is the single biggest risk to your data.
+- **No background GPS on iOS.** When the screen locks, WebKit suspends
+  JavaScript and `watchPosition` stops. Wake Lock — which prevents this — does
+  not exist on iOS. There is no workaround. For long runs, record on a watch and
+  import the GPX; the app treats that as a first-class path.
+- **No Apple Health or Google Fit API.** HealthKit is native-only, full stop.
+  Google Fit's REST API was retired and would need a secret key that a static
+  site cannot keep secret. File import is the only honest option.
+- **Web Bluetooth is absent from every iOS browser**, so no heart-rate straps
+  there. Session load falls back to duration × RPE, which needs no hardware.
+- **`BarcodeDetector` is Chromium-only.** Elsewhere the app offers manual entry
+  instead of shipping a large WASM decoder most sessions never use.
+- **Battery Status API** is absent in Safari and Firefox.
+- **Notifications on iOS** require Home Screen installation.
+- **A passkey is not encryption.** WebAuthn can gate entry to the app; deriving a
+  key from it needs the PRF extension, which is not widely supported. The
+  passphrase is the real mechanism.
+- **The live database is not encrypted.** It cannot be — the app has to read it.
+  Encryption protects the exported *file*. Anyone with your unlocked phone has
+  your data.
+- **Dexie loads from a pinned CDN** on first run. `src/db/dexie.js` documents the
+  four steps to vendor it locally and remove that one network dependency.
+- **Open Food Facts** asks clients to send an identifying `User-Agent`, which
+  browsers do not permit. The app caches aggressively and stays well inside their
+  rate limits instead.
+
+---
+
+## Safety, implemented rather than promised
+
+These are in code and asserted by tests, not just described here:
+
+- Calorie targets have an absolute floor (1200 / 1500 / 1300 kcal by sex) applied
+  *after* every other adjustment, and are never set below estimated resting
+  expenditure. A manual override under 1000 kcal is rejected.
+- **Readiness refuses to produce a score from fewer than three inputs.** A number
+  built from one data point is noise wearing a badge, and someone would
+  reasonably train hard on the strength of it.
+- **Nothing ever tells you to train harder in response to a fatigue signal.**
+  There is a test that asserts this at peak readiness.
+- Training load stays silent below 14 days of history.
+- BMI is framed as a reference range, never as a verdict, and always with the
+  caveat that it cannot distinguish muscle from fat.
+- Body measurements are never described in judgemental language.
+- Correlations always carry "not causation", and are not reported below 12
+  overlapping days.
+- Every destructive action is confirmed; the irreversible ones require typing a
+  word.
+- Charts draw missing days as gaps. A day you did not weigh yourself is not a day
+  you weighed nothing.
+
+---
+
+## Project layout
 
 ```
-index.html              app shell, dock navigation, landmarks
-404.html                redirects path-style URLs into the hash router
-manifest.webmanifest    PWA metadata, relative scope for subpath hosting
-sw.js                   versioned precache, offline shell, update flow
-tests.html              in-browser test runner
-
-styles/
-  tokens.css            palette, type, motion & contrast overrides
-  app.css               components
-
+index.html  404.html  manifest.webmanifest  sw.js  tests.html
+styles/     tokens.css (CSS defaults)  app.css
 src/
-  main.js               boot sequence, route table, SW registration, error boundaries
-  core/
-    router.js           hash router with focus management
-    ui.js               el() hyperscript, formatters, toasts, accessible modal
-    capabilities.js     honest feature detection with platform caveats
-    prefs.js            motion / contrast / text-size preferences
-  db/
-    dexie.js            the one place Dexie is imported (see below)
-    database.js         versioned schema + migration pattern
-    repos.js            repositories: CRUD, soft delete, restore, audit
-  engines/              PURE. No DOM, no database. This is what the tests cover.
-    biomath.js          BMI, BMR, TDEE, calorie floors, macros, hydration, conversion
-    logparser.js        natural-language parsing → candidates, never writes
-    analytics.js        daily totals, rolling averages, streaks, adaptive TDEE
-  features/             one module per screen; all data access via repositories
-    onboarding.js  today.js  log.js  timeline.js  body.js  settings.js  backup.js
-  tests/
-    harness.js  engines.test.js  node.mjs
+  config/   theme.js          <- all colours, fonts, metrics
+            app.config.js     <- all behavioural constants
+  core/     main entry, router, ui, charts, cryptobox, appearance,
+            capabilities, prefs
+  db/       dexie, database (schema + migrations), repos, seeds
+  engines/  biomath, logparser, analytics, training, geo, nutrition, recovery
+            (all pure - no DOM, no database, no clock. This is what makes
+             the test suite meaningful.)
+  features/ one module per screen
+  tests/    harness + 208 tests
 ```
 
-Four rules the code enforces, so later phases inherit them rather than relitigating them:
+Architecture rules worth preserving if you extend it:
 
-- **Engines are pure.** No DOM, no database, no clock reads except where passed in. That is what makes 64 tests possible with no framework and no browser driver.
-- **No feature module touches a Dexie table.** Everything goes through a repository, so soft delete, audit logging, timezone stamping and `dateKey` derivation happen in one place and cannot be forgotten at a call site.
-- **`dateKey` is stored, not derived.** A local calendar day computed from a UTC timestamp at read time is wrong the moment the user travels, and IndexedDB cannot index a computed value.
-- **`tz` travels with every timestamp.** A 06:00 run in Chennai and a 06:00 run in Berlin are different events.
-
-### The one third-party dependency
-
-Dexie is loaded from a pinned CDN URL and precached by the service worker, so after the first successful load the app is fully offline. **The first load does need a network connection.** That is the single honest deviation from "offline from the very first byte".
-
-To remove it entirely, `src/db/dexie.js` documents the four-step vendoring process — download one file, commit it, change one line, add one path to the service worker. Recommended for a long-lived personal install.
+1. **Engines stay pure.** No DOM, no database, no `Date.now()` inside a
+   calculation. Testability is downstream of this.
+2. **Features never touch Dexie directly** — always via `repos.js`, so soft
+   delete, audit trails and timezone stamping happen in exactly one place.
+3. **`dateKey` is stored, not derived**, and a timezone travels with every
+   timestamp. Otherwise a trip abroad silently rewrites your history.
+4. **Live records, not form submits.** Workout sets and GPS fixes are written as
+   they happen, because a phone sleeping mid-session is not an edge case.
 
 ---
 
-## Known gaps in the test coverage
+## Running the tests
 
-The build prompt asks for tests covering database CRUD, migrations, backup restoration, import/export, duplicate detection and GPS filtering. What is tested here is everything pure: bio-math, unit conversion, the parser, the analytics reducers — 64 assertions.
+```
+npm test          # headless, no dependencies
+```
 
-**The database, migration and backup-restore paths are not covered by automated tests.** They need a real IndexedDB and therefore a driven browser session (Playwright or similar), which needs a Node toolchain this repository deliberately does not have. That code is written defensively — restore validates fully before touching the database, runs in a single transaction, and detects duplicates by content signature rather than by id — but written defensively is not the same as verified. Manual checklist until that suite exists:
+Or open `tests.html` in a browser for the same suite with a UI.
 
-1. Log a few entries, export a full backup, erase all data, restore from the file, confirm the counts match.
-2. Import the same backup twice. The second import should skip everything as duplicates.
-3. Open the app in two tabs, log in one, and confirm the other prompts to reload rather than erroring.
-4. Load once online, switch the device to airplane mode, close and reopen. Everything should still work.
-5. Bump `CACHE_VERSION`, redeploy, and confirm the update toast appears rather than the old shell persisting.
+Some of those tests exist because the bug they check for was real during this
+build, and each one produced a *plausible, confident, wrong number* rather than a
+crash — which is the dangerous kind. They are marked `REGRESSION`:
 
----
-
-## Roadmap (the spec's own phasing)
-
-| Phase | Scope | Status |
-|---|---|---|
-| 1 | Shell, routing, theme, IndexedDB, profile, Universal LOG, service worker, PWA | **Done** |
-| 2 | Nutrition, foods, meals, recipes, hydration | Next |
-| 3 | Workout, exercise library, anatomical selector, programs, timers | |
-| 4 | GPS, outdoor tracking, running, cycling, GPX import | |
-| 5 | Recovery, sleep, training load, health file import | |
-| 6 | Body photos, timelapse, analytics, PRs, achievements | |
-| 7 | Recommendations, advanced analytics, encrypted vault | |
-| 8 | Browser-driver test suite, optimisation, accessibility audit | |
-
-Phase 2 is the natural next slice: the schema tables, repositories and log types already exist, so it is a nutrition search UI and an Open Food Facts cache rather than new foundations.
+- `Number(null)` is `0` and `0` is finite, so a missing soreness reading arrived
+  as a present reading of zero, scored as perfect, and readiness returned a
+  confident score from a single real input.
+- Fibre counted at 4 kcal/g made every high-fibre vegetable fail a sanity check
+  on data that was perfectly correct.
+- A tower-handoff GPS jump, accepted, adds distance that was never travelled.
+- Barometric jitter of a metre, accumulated over hundreds of samples, turns a
+  flat park loop into 300 m of climb.
+- Apple's date format parses in Chrome and returns `NaN` in Safari — which would
+  have silently discarded every record on the very device the export came from.
 
 ---
 
-## A note on the health numbers
-
-Every physiological figure in this app is an estimate from a population equation, labelled as one wherever it appears. Calorie targets have hard floors — 1200 kcal for female profiles, 1500 for male, and never below estimated resting expenditure — applied after every other adjustment, so an aggressive goal on a small frame cannot multiply down into a number that would be unsafe to follow. Readiness and training load are performance signals, not medical assessments, and the app never presents them as diagnoses.
-
-If you are managing a medical condition, recovering from injury, or considering a significant change to how you eat or train, this app is a logbook, not a clinician.
+*Estimates are labelled as estimates. This is not a medical device, and nothing
+here diagnoses anything.*

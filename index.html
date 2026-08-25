@@ -49,30 +49,10 @@
   </main>
 </div>
 
-<nav class="dock" id="dock" aria-label="Main">
-  <div class="dock-inner">
-    <a href="#/today" data-route="today">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path d="M3 12h4l2.5 6L14 5l2.5 7H21"/></svg>
-      <span>Today</span><span class="ink"></span>
-    </a>
-    <a href="#/timeline" data-route="timeline">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path d="M5 4v16"/><circle cx="5" cy="8" r="2"/><circle cx="5" cy="16" r="2"/><path d="M10 8h9M10 16h6"/></svg>
-      <span>Timeline</span><span class="ink"></span>
-    </a>
-    <a href="#/log" data-route="log" class="log-action" aria-label="Log something">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-      <span>Log</span><span class="ink"></span>
-    </a>
-    <a href="#/body" data-route="body">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><circle cx="12" cy="5" r="2.4"/><path d="M12 8v5m0 0-3.5 7M12 13l3.5 7M6.5 10.5 12 9l5.5 1.5"/></svg>
-      <span>Body</span><span class="ink"></span>
-    </a>
-    <a href="#/settings" data-route="settings">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M18.4 5.6l-1.8 1.8M7.4 16.6l-1.8 1.8"/></svg>
-      <span>Settings</span><span class="ink"></span>
-    </a>
-  </div>
-</nav>
+<!-- The dock is generated at boot by buildDock() in src/main.js from UI.nav in
+     src/config/app.config.js, so disabling a feature genuinely removes its tab.
+     Kept empty here rather than duplicated, so there is one source of truth. -->
+<nav class="dock" id="dock" aria-label="Main"></nav>
 
 <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
 

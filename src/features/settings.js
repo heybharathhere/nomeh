@@ -23,6 +23,9 @@ import {
 import { refresh } from '../core/router.js';
 import { LOG_TYPES } from '../engines/logparser.js';
 
+import { appearanceCard, vaultCard, dataMaintenanceCard } from './appearance-settings.js';
+import { UI, enabled } from '../config/app.config.js';
+
 export async function settingsView() {
   const [profile, settings, storage, perms, backup] = await Promise.all([
     Profile.get(), allSettings(), storageReport(), permissionStates(), backupStatus()
@@ -33,16 +36,53 @@ export async function settingsView() {
     el('p', { class: 'eyebrow' }, 'Your device, your data'),
     el('h1', { class: 'page-title' }, 'Settings'),
     backup.overdue ? backupNudge(backup) : null,
+    screensCard(),
     profileCard(profile),
+    await appearanceCard(),
     unitsCard(settings),
     accessibilityCard(settings),
     backupCard(backup),
+    await vaultCard(),
+    await dataMaintenanceCard(),
     storageCard(storage),
     privacyCard(perms, caps),
     capabilityCard(caps),
     installCard(),
     trashCard(),
     dangerCard()
+  );
+}
+
+/* ----------------------------------------------------------- screens ----- */
+
+/* The dock holds five tabs; the app has more screens than that. Rather than
+   cramming them in or hiding them, everything else is listed here and on Today.
+   Entries whose feature flag is off are omitted entirely. */
+const SECONDARY = [
+  { route: 'endurance', label: 'Runs & rides', hint: 'GPS tracking, GPX import', feature: 'endurance' },
+  { route: 'recovery', label: 'Recovery', hint: 'Sleep, readiness, training load', feature: 'recovery' },
+  { route: 'analytics', label: 'Analytics', hint: 'Trends and correlations', feature: 'analytics' },
+  { route: 'photos', label: 'Progress photos', hint: 'Stored on this device only', feature: 'photos' },
+  { route: 'timeline', label: 'Timeline', hint: 'Everything you have logged' },
+  { route: 'diary', label: 'Food diary', hint: 'Meals, macros, hydration', feature: 'nutrition' },
+  { route: 'train', label: 'Training', hint: 'Sessions, PRs, programmes', feature: 'strength' },
+  { route: 'import', label: 'Import health data', hint: 'Apple Health, Strava, Google Fit files', feature: 'healthImport' },
+];
+
+export function screensCard() {
+  const available = SECONDARY.filter((s) => enabled(s.feature));
+  const inDock = new Set(UI.nav.map((n) => n.route));
+  const rows = available.filter((s) => !inDock.has(s.route));
+  if (!rows.length) return null;
+
+  return card('All screens', { note: `${rows.length} more` },
+    ...rows.map((r) => el('a', { class: 'entry entry-btn', href: `#/${r.route}` },
+      el('div', { class: 'entry-main' },
+        el('span', { class: 'entry-label' }, r.label),
+        el('span', { class: 'muted-sm' }, r.hint),
+      ),
+      el('span', { class: 'entry-value' }, '\u203a'),
+    )),
   );
 }
 

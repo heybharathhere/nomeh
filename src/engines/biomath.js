@@ -10,30 +10,16 @@
  *     because the arithmetic said so is a hazard, not a feature.
  */
 
-export const ACTIVITY_FACTORS = {
-  sedentary:   { factor: 1.200, label: 'Sedentary',        hint: 'Desk work, little deliberate movement' },
-  light:       { factor: 1.375, label: 'Lightly active',   hint: 'Light exercise 1–3 days a week' },
-  moderate:    { factor: 1.550, label: 'Moderately active', hint: 'Moderate exercise 3–5 days a week' },
-  high:        { factor: 1.725, label: 'Very active',      hint: 'Hard exercise 6–7 days a week' },
-  athlete:     { factor: 1.900, label: 'Extremely active', hint: 'Physical job or twice-daily training' }
-};
+import { PHYSIOLOGY, SAFETY, NUTRITION } from '../config/app.config.js';
 
-export const GOALS = {
-  fat_loss:    { label: 'Fat loss',            calorieDelta: -0.18, proteinPerKg: 2.0, domain: 'nutrition' },
-  hypertrophy: { label: 'Muscle growth',       calorieDelta: +0.10, proteinPerKg: 1.9, domain: 'strength'  },
-  strength:    { label: 'Strength',            calorieDelta: +0.05, proteinPerKg: 1.8, domain: 'strength'  },
-  general:     { label: 'General fitness',     calorieDelta:  0.00, proteinPerKg: 1.6, domain: 'general'   },
-  endurance:   { label: '10K+ endurance',      calorieDelta:  0.00, proteinPerKg: 1.6, domain: 'endurance' },
-  calisthenics:{ label: 'Calisthenics',        calorieDelta: -0.05, proteinPerKg: 1.9, domain: 'strength'  },
-  cycling:     { label: 'Cycling performance', calorieDelta:  0.00, proteinPerKg: 1.6, domain: 'endurance' },
-  consistency: { label: 'Consistency',         calorieDelta:  0.00, proteinPerKg: 1.6, domain: 'general'   }
-};
+const NUTRITION_KCAL = NUTRITION.kcalPerGram;
 
-/* Absolute floors, applied after every other adjustment. These are widely used
-   minimum intakes for unsupervised self-directed dieting; they are here so an
-   aggressive goal plus a low body weight can never multiply into a number that
-   would be unsafe to follow. */
-export const CALORIE_FLOOR = { female: 1200, male: 1500, unspecified: 1300 };
+/* Constants are not defined here. They live in src/config/app.config.js so that
+   every tunable number in the app is editable from one place. These re-exports
+   keep the engine's public surface stable for callers and tests. */
+export const ACTIVITY_FACTORS = PHYSIOLOGY.activityFactors;
+export const GOALS            = PHYSIOLOGY.goals;
+export const CALORIE_FLOOR    = PHYSIOLOGY.calorieFloor;
 
 const round = (n, dp = 0) => {
   const f = 10 ** dp;
@@ -50,11 +36,8 @@ export function bmi(weightKg, heightCm) {
    and the caveat travels with the value rather than being buried in a footnote. */
 export function bmiContext(value) {
   if (value == null) return null;
-  const band =
-    value < 18.5 ? 'below the reference range' :
-    value < 25   ? 'within the reference range' :
-    value < 30   ? 'above the reference range' :
-                   'well above the reference range';
+  const band = (PHYSIOLOGY.bmiBands.find((b) => value < b.under)
+             ?? PHYSIOLOGY.bmiBands[PHYSIOLOGY.bmiBands.length - 1]).band;
   return {
     band,
     caveat: 'BMI is a population screening ratio. It cannot distinguish muscle from fat, ' +
@@ -87,11 +70,14 @@ export function calorieTarget({ tdeeValue, goalKey, sex, bmrValue }) {
   const goal = GOALS[goalKey] || GOALS.general;
   const raw = tdeeValue * (1 + goal.calorieDelta);
 
-  const floors = [CALORIE_FLOOR[sex] ?? CALORIE_FLOOR.unspecified];
-  /* Never prescribe below resting expenditure either — for a large person the
-     fixed floor is not the binding constraint. */
-  if (bmrValue) floors.push(bmrValue);
-  const floor = Math.max(...floors);
+  const floors = [];
+  if (SAFETY.enforceCalorieFloor) {
+    floors.push(CALORIE_FLOOR[sex] ?? CALORIE_FLOOR.unspecified);
+    /* Never prescribe below resting expenditure either — for a large person the
+       fixed floor is not the binding constraint. */
+    if (bmrValue && PHYSIOLOGY.neverBelowBmr) floors.push(bmrValue);
+  }
+  const floor = floors.length ? Math.max(...floors) : 0;
 
   const value = Math.max(raw, floor);
   return {
@@ -106,14 +92,15 @@ export function macroTargets({ calories, weightKg, goalKey }) {
   if (!calories || !(weightKg > 0)) return null;
   const goal = GOALS[goalKey] || GOALS.general;
 
+  const kpg      = NUTRITION_KCAL;
   const proteinG = round(weightKg * goal.proteinPerKg);
-  const fatG     = round((calories * 0.25) / 9);
-  const carbKcal = calories - proteinG * 4 - fatG * 9;
+  const fatG     = round((calories * PHYSIOLOGY.fatFractionOfCalories) / kpg.fat);
+  const carbKcal = calories - proteinG * kpg.protein - fatG * kpg.fat;
   /* If protein and fat alone exceed the calorie budget, carbohydrate cannot go
      negative — clamp and let the UI surface the conflict instead of printing a
      nonsense number. */
-  const carbsG   = round(Math.max(0, carbKcal) / 4);
-  const fiberG   = round((calories / 1000) * 14);
+  const carbsG   = round(Math.max(0, carbKcal) / kpg.carbs);
+  const fiberG   = round((calories / 1000) * PHYSIOLOGY.fibrePer1000Kcal);
 
   return {
     protein: proteinG,
@@ -124,12 +111,12 @@ export function macroTargets({ calories, weightKg, goalKey }) {
   };
 }
 
-/* 35 ml/kg baseline, plus an activity allowance. A starting point to adjust
+/* Bodyweight baseline plus an activity allowance, both from config. A starting point to adjust
    from, not a prescription — thirst and climate beat any formula. */
 export function waterTarget({ weightKg, activityKey }) {
   if (!(weightKg > 0)) return null;
-  const extra = { sedentary: 0, light: 250, moderate: 500, high: 750, athlete: 1000 };
-  return round(weightKg * 35 + (extra[activityKey] ?? 500));
+  const extra = PHYSIOLOGY.waterMlByActivity;
+  return round(weightKg * PHYSIOLOGY.waterMlPerKg + (extra[activityKey] ?? extra.moderate));
 }
 
 export function computeTargets(profile) {

@@ -202,6 +202,67 @@ export const PRs          = makeRepo('prs', { softDelete: false });
 export const Achievements = makeRepo('achievements', { softDelete: false });
 export const Audit        = makeRepo('audit', { softDelete: false });
 
+/* Phase 2–7 tables. Foods orders by recency now that `at` is indexed (v3), so
+   the food picker shows what you actually eat rather than an alphabet. */
+export const Exercises    = makeRepo('exercises', { timeField: 'name', stampDate: false });
+export const Programs     = makeRepo('programs', { timeField: 'createdAt' });
+export const ProgramDays  = makeRepo('programDays', { softDelete: false, stampDate: false, timeField: 'day' });
+export const WorkoutSets  = makeRepo('workoutSets', { softDelete: false });
+export const MealItems    = makeRepo('mealItems', { softDelete: false, stampDate: false, timeField: 'mealId' });
+export const Recipes      = makeRepo('recipes', { timeField: 'createdAt' });
+export const RecipeItems  = makeRepo('recipeItems', { softDelete: false, stampDate: false, timeField: 'recipeId' });
+export const Hydration    = makeRepo('hydration', { softDelete: false });
+export const RoutePoints  = makeRepo('routePoints', { softDelete: false, stampDate: false, timeField: 't' });
+export const Laps         = makeRepo('laps', { softDelete: false, stampDate: false, timeField: 'index' });
+export const Bikes        = makeRepo('bikes', { timeField: 'name', stampDate: false });
+export const Recovery     = makeRepo('recovery', { softDelete: false });
+export const Health       = makeRepo('health', { softDelete: false });
+export const TrainingLoad = makeRepo('trainingLoad', { softDelete: false, stampDate: false, timeField: 'dateKey' });
+export const Recommendations = makeRepo('recommendations', { softDelete: false });
+
+/* Foods needs recency ordering, which v3 made possible. */
+export const RecentFoods = {
+  async list(limit = 30) {
+    return db().foods.orderBy('at').reverse()
+      .filter((f) => !f.deletedAt).limit(limit).toArray();
+  },
+};
+
+/* Photo blobs are keyed by photoId rather than an autoincrement, so they get a
+   hand-written accessor instead of makeRepo. Kept in a separate table so the
+   storage dashboard can size images independently of everything else, and so
+   deleting a photo's image never risks touching its metadata row. */
+export const PhotoBlobs = {
+  async put(photoId, blob) { return db().photoBlobs.put({ photoId, blob, bytes: blob?.size ?? 0, at: Date.now() }); },
+  async get(photoId) { return db().photoBlobs.get(photoId); },
+  async remove(photoId) { return db().photoBlobs.delete(photoId); },
+  async totalBytes() {
+    let total = 0;
+    await db().photoBlobs.each((r) => { total += r.bytes ?? r.blob?.size ?? 0; });
+    return total;
+  },
+  async count() { return db().photoBlobs.count(); },
+};
+
+/* Network caches. Kept out of backups (see CACHE_TABLES) since they are
+   rebuildable, and expiry is checked on read rather than swept on a timer —
+   a background sweep in a page that may be closed at any moment is a job that
+   silently never runs. */
+export const Cache = {
+  async get(table, key, maxAgeMs) {
+    const row = await db()[table].get(key);
+    if (!row) return null;
+    if (maxAgeMs && Date.now() - (row.at ?? 0) > maxAgeMs) {
+      await db()[table].delete(key);
+      return null;
+    }
+    return row.value;
+  },
+  async set(table, key, value) { return db()[table].put({ key, value, at: Date.now() }); },
+  async clear(table) { return db()[table].clear(); },
+  async size(table) { return db()[table].count(); },
+};
+
 /* Profile is a single row, so it gets a purpose-built accessor rather than the
    generic repo — pretending it is a collection only invites bugs. */
 export const Profile = {

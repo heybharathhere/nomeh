@@ -6,12 +6,16 @@
  * step has a visible failure state.
  */
 
-import { openDatabase, ensureDefaults } from './db/database.js';
+import { openDatabase, ensureDefaults, db } from './db/database.js';
 import { Profile } from './db/repos.js';
 import { loadPrefs } from './core/prefs.js';
 import { route, setNotFound, startRouter } from './core/router.js';
 import { el, toast, card, callout } from './core/ui.js';
 import { capabilities } from './core/capabilities.js';
+
+import { applyBaseTheme, loadAppearance } from './core/appearance.js';
+import { installSeeds } from './db/seeds.js';
+import { UI, FEATURES, enabled } from './config/app.config.js';
 
 import { onboardingView } from './features/onboarding.js';
 import { todayView } from './features/today.js';
@@ -19,10 +23,22 @@ import { logView } from './features/log.js';
 import { timelineView } from './features/timeline.js';
 import { bodyView } from './features/body.js';
 import { settingsView } from './features/settings.js';
+import { diaryView } from './features/diary.js';
+import { trainView } from './features/train.js';
+import { enduranceView } from './features/endurance.js';
+import { recoveryView } from './features/recovery.js';
+import { analyticsView } from './features/analytics.js';
+import { photosView } from './features/photos.js';
+import { healthImportView } from './features/healthimport.js';
 
 boot();
 
 async function boot() {
+  /* Theme first, before any view renders. tokens.css already holds the same
+     defaults so the first paint is correct either way, but applying here means
+     a changed ACTIVE_PRESET takes effect immediately rather than flashing. */
+  applyBaseTheme();
+
   const caps = capabilities();
 
   if (caps.missingEssentials.length) {
@@ -37,6 +53,9 @@ async function boot() {
   try {
     await openDatabase();
     await ensureDefaults();
+    /* Seeds only populate empty tables, so this is safe on every boot and is
+       what makes the app usable offline from the first second. */
+    await installSeeds(db());
   } catch (err) {
     console.error('[boot] database failed', err);
     return fatal(
@@ -49,7 +68,9 @@ async function boot() {
     );
   }
 
+  await loadAppearance();
   await loadPrefs();
+  buildDock();
   wireNetworkStatus();
   wireDatabaseGuard();
   registerRoutes();
@@ -75,6 +96,26 @@ function registerRoutes() {
   route('/settings', guard(settingsView));
   route('/welcome', () => onboardingView());
 
+  /* Feature-gated screens. A disabled feature renders an explanation naming the
+     flag rather than 404ing, so a bookmarked link stays comprehensible. */
+  const gated = (feature, view) => guard(async (ctx) => {
+    if (!enabled(feature)) {
+      return card(`${feature} is switched off`, {},
+        el('p', { style: { color: 'var(--text-dim)', fontSize: '.9rem' } },
+          `FEATURES.${feature} is false in src/config/app.config.js. Set it to true to enable this screen.`),
+        el('a', { class: 'btn btn-sm', href: '#/today' }, 'Back to Today'));
+    }
+    return view(ctx);
+  });
+
+  route('/diary', gated('nutrition', diaryView));
+  route('/train', gated('strength', trainView));
+  route('/endurance', gated('endurance', enduranceView));
+  route('/recovery', gated('recovery', recoveryView));
+  route('/analytics', gated('analytics', analyticsView));
+  route('/photos', gated('photos', photosView));
+  route('/import', gated('healthImport', healthImportView));
+
   setNotFound(async () => {
     if (!(await Profile.exists())) return onboardingView();
     return card('Nothing here', {},
@@ -83,6 +124,54 @@ function registerRoutes() {
       el('a', { class: 'btn btn-primary btn-sm', href: '#/today' }, 'Back to Today')
     );
   });
+}
+
+/* -------------------------------------------------------------- dock ----- */
+
+const ICONS = {
+  pulse: 'M3 12h4l2-6 3 12 3-9 2 3h4',
+  plate: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zm0 4a5 5 0 1 1 0 10 5 5 0 0 1 0-10z',
+  plus: 'M12 5v14M5 12h14',
+  dumbbell: 'M4 9v6M8 7v10M16 7v10M20 9v6M8 12h8',
+  body: 'M12 4a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm-3 6h6l-1 5 1 5h-2l-1-4-1 4H9l1-5-1-5z',
+  route: 'M6 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm12-10a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM8 17c6 0 8-2 8-6',
+  moon: 'M20 14a8 8 0 1 1-9-11 7 7 0 0 0 9 11z',
+  chart: 'M4 20V10M10 20V4M16 20v-7M22 20H2',
+};
+
+/* The dock is generated rather than written into index.html, so turning a
+   feature off in config genuinely removes its tab instead of leaving a link to
+   a screen that explains it is disabled. */
+function buildDock() {
+  const dock = document.getElementById('dock');
+  if (!dock) return;
+
+  const items = UI.nav.filter((item) => enabled(item.feature));
+  const inner = el('div', { class: 'dock-inner' });
+
+  for (const item of items) {
+    const path = ICONS[item.icon] ?? ICONS.pulse;
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('aria-hidden', 'true');
+    const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    p.setAttribute('d', path);
+    p.setAttribute('fill', 'none');
+    p.setAttribute('stroke', 'currentColor');
+    p.setAttribute('stroke-width', '1.8');
+    p.setAttribute('stroke-linecap', 'round');
+    p.setAttribute('stroke-linejoin', 'round');
+    svg.appendChild(p);
+
+    inner.append(el('a', {
+      href: `#/${item.route}`,
+      dataset: { route: item.route },
+      class: item.primary ? 'log-action' : '',
+      'aria-label': item.label,
+    }, svg, item.primary ? null : el('span', {}, item.label)));
+  }
+
+  dock.replaceChildren(inner);
 }
 
 /* ------------------------------------------------------------ status ----- */

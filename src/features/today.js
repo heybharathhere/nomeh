@@ -12,6 +12,7 @@ import { dailyTotals, currentStreak, sufficiency, seriesByDay, rollingAverage } 
 import { computeTargets, bmiContext } from '../engines/biomath.js';
 import { describe } from './log.js';
 import { LOG_TYPES } from '../engines/logparser.js';
+import { enabled } from '../config/app.config.js';
 
 export async function todayView() {
   const profile = await Profile.get();
@@ -40,10 +41,27 @@ export async function todayView() {
     movement(totals),
     readiness(todayLogs, recent),
     weightTrend(recent, profile),
-    todayLog(todayLogs, clock)
+    todayLog(todayLogs, clock),
+    quickLinks()
   );
 
   return host;
+}
+
+/* Direct routes to the screens that do not fit in the five-tab dock. Filtered by
+   feature flag, so a slimmed-down build shows only what it actually has. */
+function quickLinks() {
+  const links = [
+    { route: 'endurance', label: 'Runs & rides', feature: 'endurance' },
+    { route: 'recovery', label: 'Recovery', feature: 'recovery' },
+    { route: 'analytics', label: 'Analytics', feature: 'analytics' },
+    { route: 'photos', label: 'Photos', feature: 'photos' },
+    { route: 'timeline', label: 'Timeline' },
+    { route: 'settings', label: 'Settings' },
+  ].filter((l) => enabled(l.feature));
+
+  return el('div', { class: 'chip-row' },
+    ...links.map((l) => el('a', { class: 'chip chip-btn', href: `#/${l.route}` }, l.label)));
 }
 
 function greeting() {

@@ -51,6 +51,7 @@
 <script type="module">
 import { runAll, getSuites } from './src/tests/harness.js';
 import './src/tests/engines.test.js';
+import './src/tests/phases.test.js';
 
 const out = document.getElementById('out');
 const { results, passed, failed, total } = await runAll();

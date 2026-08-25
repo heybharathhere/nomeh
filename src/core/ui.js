@@ -40,10 +40,33 @@ export function clear(node) { while (node.firstChild) node.removeChild(node.firs
 
 /* Named colour → CSS custom properties, so a component can be tinted by
    meaning ("this is hydration") rather than by hex. */
+/* Returns a style string setting --c and --c-dim, so a component inherits its
+   accent without hard-coding a hue.
+
+   Accepts either vocabulary: the semantic names the app reasons in
+   ('nutrition', 'strength'…) or the raw token names ('amber', 'violet'…). The
+   semantic ones are preferred in new code — they are what the theme file maps,
+   so a recolour changes the hue without touching a single component. */
+const COLOUR_ALIASES = {
+  performance: 'emerald', nutrition: 'amber', strength: 'violet',
+  recovery: 'cyan', alert: 'crimson',
+  /* convenience synonyms used in a few places */
+  hydration: 'cyan', warning: 'crimson', danger: 'crimson', active: 'emerald',
+};
+
 export function tint(name) {
   const known = ['emerald', 'amber', 'violet', 'cyan', 'crimson'];
-  const c = known.includes(name) ? name : 'emerald';
+  const mapped = COLOUR_ALIASES[name] ?? name;
+  const c = known.includes(mapped) ? mapped : 'emerald';
   return `--c: var(--${c}); --c-dim: var(--${c}-dim);`;
+}
+
+/* The bare CSS variable, for the cases that genuinely need a colour value
+   rather than a style block (an inline SVG stroke, a chart series). */
+export function colourVar(name) {
+  const known = ['emerald', 'amber', 'violet', 'cyan', 'crimson'];
+  const mapped = COLOUR_ALIASES[name] ?? name;
+  return `var(--${known.includes(mapped) ? mapped : 'emerald'})`;
 }
 
 /* ------------------------------------------------------------ format ----- */
@@ -110,11 +133,17 @@ export function toast(message, { tone = 'emerald', action, onAction, timeout = 5
 
   const dismiss = () => { node.style.opacity = '0'; setTimeout(() => node.remove(), 180); };
 
-  if (action && onAction) {
+  /* Two call shapes are accepted: (msg, {action:'Undo', onAction:fn}) and
+     (msg, {action:{label:'Undo', fn}}). The second reads better at the call
+     site when the handler is a closure, which is most of the time. */
+  const actionLabel = typeof action === 'string' ? action : action?.label;
+  const actionFn = onAction ?? (typeof action === 'object' ? action?.fn : null);
+
+  if (actionLabel && actionFn) {
     node.append(el('button', {
       class: 'btn btn-sm btn-ghost',
-      onclick: () => { onAction(); dismiss(); }
-    }, action));
+      onclick: () => { actionFn(); dismiss(); }
+    }, actionLabel));
   }
   node.append(el('button', {
     class: 'btn btn-sm btn-ghost', 'aria-label': 'Dismiss', onclick: dismiss
@@ -129,7 +158,7 @@ export function toast(message, { tone = 'emerald', action, onAction, timeout = 5
 /* Modal with focus trapping, Escape to close, and focus returned to whatever
    opened it. Built by hand because a11y is the whole point of the component. */
 
-export function sheet({ title, body, footer, onClose } = {}) {
+export function sheet({ title, body, footer, onClose, confirmLabel, onConfirm, cancelLabel = 'Cancel' } = {}) {
   const opener = document.activeElement;
   const scrim = el('div', { class: 'sheet-scrim' });
   const panel = el('div', {
@@ -156,6 +185,30 @@ export function sheet({ title, body, footer, onClose } = {}) {
     else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
   };
 
+  /* A confirm handler may be async and may reject the close by returning false —
+     that is what lets a form sheet report a validation error in place instead of
+     vanishing and losing what the user typed. */
+  let confirmFooter = null;
+  if (confirmLabel && onConfirm) {
+    const go = el('button', { class: 'btn btn-primary' }, confirmLabel);
+    go.onclick = async () => {
+      go.disabled = true;
+      const label = go.textContent;
+      go.textContent = 'Working…';
+      try {
+        const result = await onConfirm();
+        if (result === false) { go.disabled = false; go.textContent = label; return; }
+        close();
+      } catch (err) {
+        console.error('[sheet] confirm failed', err);
+        toast(err?.message || 'That did not work.', { tone: 'crimson' });
+        go.disabled = false; go.textContent = label;
+      }
+    };
+    confirmFooter = el('div', { class: 'row' },
+      el('button', { class: 'btn btn-ghost', onclick: close }, cancelLabel), go);
+  }
+
   panel.append(
     el('div', { class: 'sheet-grab', 'aria-hidden': 'true' }),
     el('div', { class: 'sheet-head' },
@@ -163,7 +216,8 @@ export function sheet({ title, body, footer, onClose } = {}) {
       el('button', { class: 'btn btn-sm btn-ghost spacer', 'aria-label': 'Close', onclick: close }, '✕')
     ),
     body || '',
-    footer ? el('div', { class: 'row', style: { marginTop: 'var(--s4)' } }, footer) : null
+    footer ? el('div', { class: 'row', style: { marginTop: 'var(--s4)' } }, footer) : null,
+    confirmFooter
   );
 
   scrim.addEventListener('click', close);

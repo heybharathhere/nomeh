@@ -438,3 +438,139 @@ button, input, select, textarea { font: inherit; color: inherit; }
   min-height: 100dvh; padding: var(--s5); text-align: center;
 }
 .boot code { font-family: var(--font-mono); font-size: .8rem; color: var(--amber); }
+
+/* ==========================================================================
+   PHASES 2–7 COMPONENTS
+   Everything below uses only the tokens from tokens.css, which src/config/theme.js
+   overrides at runtime — so a recolour needs no changes in this file.
+   ========================================================================== */
+
+/* --- generic helpers ---------------------------------------------------- */
+.stack { display: flex; flex-direction: column; gap: var(--s4); }
+.muted-sm { color: var(--text-faint); font-size: .8rem; line-height: 1.45; }
+.sub-head { font-family: var(--font-display); font-size: .82rem; text-transform: uppercase;
+  letter-spacing: .08em; color: var(--text-dim); margin: var(--s4) 0 var(--s2); }
+.row-actions { display: flex; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s3); }
+.row-actions .btn { flex: 1 1 auto; min-width: 120px; }
+
+/* --- chips -------------------------------------------------------------- */
+.chip-row { display: flex; flex-wrap: wrap; gap: var(--s2); margin: var(--s3) 0; }
+.chip-btn { cursor: pointer; border: 1px solid var(--line); background: var(--surface-3);
+  color: var(--text-dim); border-radius: var(--r-pill); padding: 8px 14px;
+  font: inherit; font-size: .82rem; min-height: var(--tap);
+  transition: border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease); }
+.chip-btn:hover:not(:disabled) { border-color: var(--line-strong); color: var(--text); }
+.chip-btn[data-on="true"] { border-color: var(--emerald); color: var(--emerald); background: var(--emerald-dim); }
+.chip-btn:disabled { opacity: .4; cursor: not-allowed; }
+.chip-xs { font-size: .68rem; padding: 3px 8px; }
+
+/* --- results list (food & exercise pickers) ----------------------------- */
+.result-list { display: flex; flex-direction: column; gap: 2px; margin-top: var(--s3);
+  max-height: 46vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.result-row { display: flex; align-items: center; gap: var(--s3); width: 100%;
+  text-align: left; background: transparent; border: 0; border-bottom: 1px solid var(--line);
+  padding: var(--s3) var(--s1); color: var(--text); font: inherit; cursor: pointer;
+  min-height: var(--tap); }
+.result-row:hover { background: var(--surface-3); }
+.result-row > div { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.result-row .entry-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* --- nutrient preview --------------------------------------------------- */
+.preview-grid, .stat-grid { display: grid; grid-template-columns: repeat(2, 1fr);
+  gap: var(--s2); margin-top: var(--s3); }
+.preview-cell, .stat-cell { display: flex; flex-direction: column; gap: 2px;
+  padding: var(--s3); background: var(--surface-2); border: 1px solid var(--line);
+  border-radius: var(--r1); }
+.stat-grid { grid-template-columns: repeat(2, 1fr); }
+.field-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--s3); }
+.split-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); margin-top: var(--s3); }
+
+/* --- day navigation ----------------------------------------------------- */
+.day-nav { display: flex; align-items: center; justify-content: space-between;
+  gap: var(--s2); padding: var(--s2) 0; }
+.day-nav strong { font-family: var(--font-display); font-size: 1rem; }
+
+/* --- entries ------------------------------------------------------------ */
+.entry-btn { width: 100%; background: transparent; border: 0;
+  border-bottom: 1px solid var(--line); color: var(--text); font: inherit;
+  cursor: pointer; text-align: left; }
+.entry-btn:hover { background: var(--surface-3); }
+
+/* --- training ----------------------------------------------------------- */
+.exercise-block { padding: var(--s3) 0; border-bottom: 1px solid var(--line); }
+.exercise-block:last-child { border-bottom: 0; }
+.exercise-head { display: flex; align-items: baseline; gap: var(--s2); }
+.set-row { display: flex; flex-wrap: wrap; gap: var(--s2); margin: var(--s2) 0; }
+.set-pill { font-family: var(--font-mono); font-size: .78rem; padding: 4px 10px;
+  border-radius: var(--r1); background: var(--surface-3); border: 1px solid var(--line);
+  color: var(--text-dim); }
+
+/* --- rest timer --------------------------------------------------------- */
+.timer { background: var(--c-dim); border: 1px solid var(--c); border-radius: var(--r2);
+  padding: var(--s3); margin-bottom: var(--s3); }
+.timer-row { display: flex; align-items: center; gap: var(--s3); }
+.timer-value { font-family: var(--font-mono); font-size: 1.4rem; color: var(--c);
+  margin-left: auto; font-variant-numeric: tabular-nums; }
+.timer-bar { height: 4px; background: var(--surface-4); border-radius: var(--r-pill);
+  margin-top: var(--s2); overflow: hidden; }
+.timer-bar > i { display: block; height: 100%; background: var(--c);
+  transition: width 240ms linear; }
+
+/* --- GPS heads-up display ---------------------------------------------- */
+.hud { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s2);
+  background: var(--c-dim); border: 1px solid var(--c); border-radius: var(--r2);
+  padding: var(--s4) var(--s3); }
+.hud-cell { display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; }
+.hud-value { font-family: var(--font-mono); font-size: 1.6rem; color: var(--text);
+  font-variant-numeric: tabular-nums; line-height: 1.1; }
+@media (max-width: 380px) { .hud-value { font-size: 1.3rem; } }
+
+.route-host { margin: var(--s3) 0; }
+.route-svg { width: 100%; height: auto; display: block;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r2); }
+
+.scanner { width: 100%; border-radius: var(--r2); background: #000;
+  aspect-ratio: 4 / 3; object-fit: cover; margin-bottom: var(--s3); }
+
+/* --- charts ------------------------------------------------------------- */
+.chart { width: 100%; height: auto; display: block; overflow: visible; }
+.chart-legend { display: flex; flex-wrap: wrap; gap: var(--s3); margin-top: var(--s2); }
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: .76rem; color: var(--text-dim); }
+.legend-swatch { width: 10px; height: 10px; border-radius: 2px; flex: none; }
+
+/* --- photos ------------------------------------------------------------- */
+.photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: var(--s2); margin-top: var(--s3); }
+.photo-cell { position: relative; aspect-ratio: 3 / 4; border-radius: var(--r1);
+  overflow: hidden; background: var(--surface-3); border: 1px solid var(--line);
+  padding: 0; cursor: pointer; }
+.photo-cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.photo-cell figcaption { position: absolute; inset: auto 0 0 0; padding: 3px 6px;
+  font-size: .64rem; background: rgba(0,0,0,.66); color: #fff; }
+.viewfinder { position: relative; border-radius: var(--r2); overflow: hidden; background: #000; }
+.viewfinder video, .viewfinder img { width: 100%; display: block; }
+/* The alignment overlay. Opacity is set inline from PHOTOS.ghostOpacity. */
+.ghost { position: absolute; inset: 0; pointer-events: none; object-fit: cover; }
+.photo-full { width: 100%; border-radius: var(--r2); display: block; }
+
+/* --- theme picker ------------------------------------------------------- */
+.theme-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--s3); margin-top: var(--s3); }
+.theme-card { display: flex; flex-direction: column; gap: var(--s2); padding: var(--s3);
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r2);
+  cursor: pointer; font: inherit; color: var(--text); text-align: left; min-height: var(--tap); }
+.theme-card:hover { border-color: var(--line-strong); }
+.theme-card[data-on="true"] { border-color: var(--emerald); box-shadow: inset 0 0 0 1px var(--emerald); }
+.swatches { display: flex; gap: 4px; }
+.swatch { width: 100%; height: 18px; border-radius: 3px; }
+.colour-row { display: flex; align-items: center; gap: var(--s3); padding: var(--s2) 0;
+  border-bottom: 1px solid var(--line); }
+.colour-row input[type="color"] { width: 44px; height: 32px; padding: 0; border: 1px solid var(--line);
+  border-radius: var(--r1); background: transparent; cursor: pointer; flex: none; }
+
+/* --- misc --------------------------------------------------------------- */
+.btn-xs { padding: 4px 9px; font-size: .74rem; min-height: 30px; }
+.pw-strength { font-size: .76rem; margin-top: 4px; }
+.import-report { margin-top: var(--s3); display: flex; flex-direction: column; gap: 4px; }
+.import-report div { font-size: .8rem; color: var(--text-dim); }
+.viewfinder-video { width: 100%; display: block; aspect-ratio: 3 / 4; object-fit: cover; }

@@ -26,15 +26,31 @@ import { loadDexie } from './dexie.js';
 export const DB_NAME = 'nomeh';
 
 /* Tables active in Phase 1. The rest are declared and reserved. */
-export const ACTIVE_TABLES = ['profile', 'goals', 'logs', 'settings', 'audit'];
+/* Tables that carry user data and therefore belong in a backup. Adding a table
+   here is all that is needed for export and restore to pick it up. */
+export const ACTIVE_TABLES = [
+  'profile', 'goals', 'logs', 'settings', 'audit',
+  'foods', 'meals', 'mealItems', 'recipes', 'recipeItems', 'hydration',
+  'workouts', 'workoutSets', 'exercises', 'programs', 'programDays',
+  'activities', 'routePoints', 'laps', 'bikes',
+  'sleep', 'recovery', 'health', 'trainingLoad',
+  'measurements', 'photos', 'prs', 'achievements',
+];
+
+/* Caches are rebuildable from the network, so they are deliberately excluded
+   from backups — there is no reason to carry megabytes of cached food data
+   around in an export. */
+export const CACHE_TABLES = ['foodCache', 'weatherCache'];
+
+/* Photo blobs are handled separately: they are large, and a user restoring on a
+   new phone may reasonably want the data without 120 MB of images. */
+export const BLOB_TABLES = ['photoBlobs'];
 
 /* Tables that participate in Trash / soft delete. */
 export const SOFT_DELETE_TABLES = [
   'goals', 'logs', 'foods', 'meals', 'recipes', 'workouts', 'exercises',
-  'programs', 'activities', 'sleep', 'measurements', 'photos'
+  'programs', 'activities', 'bikes', 'sleep', 'measurements', 'photos',
 ];
-
-let dbInstance = null;
 
 export async function openDatabase() {
   if (dbInstance) return dbInstance;
@@ -119,6 +135,39 @@ export async function openDatabase() {
     await tx.table('logs').toCollection().modify((row) => {
       if (row.source === undefined) row.source = 'manual';
       if (row.tz === undefined) row.tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+    });
+  });
+
+  /* ---------------------------------------------------------------- v3 ----
+     Phases 2–7. The full domain was declared at v1, so this adds only what the
+     new screens genuinely need: two network caches, richer filtering on the
+     exercise library, and recency ordering on foods.
+
+     Note what is NOT here — no table renames, no data reshaping. Declaring the
+     whole schema up front is what makes a feature release look like this
+     instead of a migration. */
+  db.version(3).stores({
+    /* *tags lets the library filter by several labels at once (push, beginner,
+       unilateral) without a scan. */
+    exercises:  '++id, name, category, pattern, *primaryMuscles, *equipment, *tags, deletedAt',
+    /* Recently-used foods surface first, so `at` has to be indexed. */
+    foods:      '++id, name, &barcode, source, at, deletedAt',
+    /* Open Food Facts responses, cached so the app works offline and stays well
+       inside their rate limits. Keyed by query or barcode. */
+    foodCache:  '&key, at',
+    /* Open-Meteo responses, keyed by rounded coordinates and hour. */
+    weatherCache: '&key, at',
+    /* Photo blobs live in their own table so the storage dashboard can size
+       them separately, and so deleting photos never touches log data. */
+    photoBlobs: '&photoId',
+  }).upgrade(async (tx) => {
+    /* Old rows have no tags array. An index on a missing field is fine in
+       Dexie, but the library UI filters on it, so backfill for consistency. */
+    await tx.table('exercises').toCollection().modify((row) => {
+      if (!Array.isArray(row.tags)) row.tags = [];
+    });
+    await tx.table('foods').toCollection().modify((row) => {
+      if (row.at === undefined) row.at = row.createdAt ?? Date.now();
     });
   });
 
