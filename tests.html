@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en" data-contrast="normal">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NoMeh! — engine tests</title>
+<link rel="stylesheet" href="./styles/tokens.css">
+<link rel="stylesheet" href="./styles/app.css">
+<style>
+  .shell { padding-bottom: var(--s7); }
+  .t-row { display: grid; grid-template-columns: 54px 1fr; gap: var(--s3); padding: 7px 0; font-size: .86rem; border-bottom: 1px solid var(--line); }
+  .t-row:last-child { border-bottom: 0; }
+  .t-row .v { font-family: var(--font-mono); font-size: .68rem; font-weight: 700; letter-spacing: .06em; }
+  .t-row[data-pass="true"] .v { color: var(--emerald); }
+  .t-row[data-pass="false"] .v { color: var(--crimson); }
+  .t-err { grid-column: 2; color: var(--crimson); font-family: var(--font-mono); font-size: .74rem; margin-top: 3px; }
+  .summary { font-family: var(--font-display); font-size: 2rem; font-weight: 800; letter-spacing: -.03em; }
+</style>
+</head>
+<body>
+<div class="shell">
+  <header class="topbar">
+    <span class="brand">NoMeh<em>!</em> tests</span>
+    <div class="topbar-meta"><a href="./index.html">Back to app</a></div>
+  </header>
+
+  <main id="main">
+    <p class="eyebrow">Verification</p>
+    <h1 class="page-title">Engine test suite</h1>
+
+    <section class="card" style="--c: var(--cyan); --c-dim: var(--cyan-dim)">
+      <div class="callout" style="--c: var(--cyan); --c-dim: var(--cyan-dim)">
+        <strong>What this covers.</strong>
+        <span>Every pure engine: the bio-math (BMI, BMR, TDEE, calorie floors, macros, hydration,
+        sweat rate, unit conversion), the natural-language log parser, and the analytics reducers.
+        These run on the actual device, so a browser-specific difference in number or date handling
+        shows up here rather than in your data.</span>
+      </div>
+      <p class="card-note" style="margin-top:var(--s3)">
+        Database, migration and backup-restore tests need a driven browser session and are not
+        included — see "Known gaps" in the README rather than assuming they pass.
+      </p>
+    </section>
+
+    <div id="out" class="stack" style="margin-top:var(--s4)">
+      <p class="card-note">Running…</p>
+    </div>
+  </main>
+</div>
+
+<script type="module">
+import { runAll, getSuites } from './src/tests/harness.js';
+import './src/tests/engines.test.js';
+
+const out = document.getElementById('out');
+const { results, passed, failed, total } = await runAll();
+
+out.replaceChildren();
+
+const head = document.createElement('section');
+head.className = 'card';
+head.style.cssText = failed
+  ? '--c: var(--crimson); --c-dim: var(--crimson-dim); border-color: var(--crimson)'
+  : '--c: var(--emerald); --c-dim: var(--emerald-dim)';
+head.innerHTML =
+  `<p class="eyebrow">Result</p>
+   <p class="summary" style="color:${failed ? 'var(--crimson)' : 'var(--emerald)'}">${passed}/${total}</p>
+   <p class="card-note">${failed ? `${failed} failing across ${getSuites().length} suites` : `all passing across ${getSuites().length} suites`}</p>`;
+out.append(head);
+
+for (const suite of results) {
+  const card = document.createElement('section');
+  card.className = 'card';
+  const failing = suite.tests.filter(t => !t.pass).length;
+
+  const h = document.createElement('div');
+  h.className = 'card-head';
+  h.innerHTML = `<h2>${suite.name}</h2><span class="card-note spacer">${
+    failing ? `${failing} failing` : `${suite.tests.length} passing`}</span>`;
+  card.append(h);
+
+  for (const t of suite.tests) {
+    const row = document.createElement('div');
+    row.className = 't-row';
+    row.dataset.pass = String(t.pass);
+    const v = document.createElement('span');
+    v.className = 'v';
+    v.textContent = t.pass ? 'PASS' : 'FAIL';
+    const label = document.createElement('span');
+    label.textContent = t.label;
+    row.append(v, label);
+    if (!t.pass) {
+      const err = document.createElement('div');
+      err.className = 't-err';
+      err.textContent = t.error;
+      row.append(err);
+    }
+    card.append(row);
+  }
+  out.append(card);
+}
+</script>
+</body>
+</html>

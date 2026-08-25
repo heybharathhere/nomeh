@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>NoMeh!</title>
+<meta name="robots" content="noindex">
+<style>
+  body { background:#050507; color:#f2f4f7; font-family:system-ui,sans-serif;
+         display:grid; place-items:center; min-height:100vh; margin:0; padding:24px; text-align:center }
+  a { color:#00e08a }
+</style>
+<script>
+/* Routing is hash-based, so the app never needs this file in normal use. It
+   exists for one case: someone hand-types or shares a path-style URL such as
+   /REPO/today, which GitHub Pages answers with a 404 because no such file
+   exists. Redirect them into the app rather than showing GitHub's error page.
+
+   The redirect is built from this page's own location, so it works at any
+   repository name without being edited. */
+(function () {
+  var path = location.pathname;
+  // Everything up to and including the last directory that is part of the app.
+  var base = path.replace(/\/[^\/]*$/, '/');
+  var tail = path.slice(base.length).replace(/^\/+/, '');
+  var target = base + 'index.html' + (tail ? '#/' + tail : '');
+  location.replace(target);
+})();
+</script>
+</head>
+<body>
+  <div>
+    <h1>Redirecting…</h1>
+    <p>If nothing happens, <a href="./index.html">open NoMeh!</a>.</p>
+  </div>
+</body>
+</html>

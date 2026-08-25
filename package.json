@@ -1,0 +1,10 @@
+{
+  "name": "nomeh",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "NoMeh! — offline-first personal performance PWA. No build step: the files in this repo ARE the deployed app. This package.json exists only so the engine tests can also run headlessly under Node.",
+  "scripts": {
+    "test": "node src/tests/node.mjs"
+  }
+}
