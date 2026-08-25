@@ -1,0 +1,101 @@
+/* NoMeh! — design tokens
+   Palette and typography are fixed by the product brief (section 43 / UX REQUIREMENTS).
+   Do not introduce new hues here; map new meanings onto the existing functional colours. */
+
+:root {
+  /* Void Black + dark surfaces */
+  --void:        #050507;
+  --surface-1:   #0a0b0e;
+  --surface-2:   #101218;
+  --surface-3:   #171a22;
+  --surface-4:   #1f2430;
+
+  /* Subtle borders */
+  --line:        #23272f;
+  --line-strong: #313743;
+
+  /* Text */
+  --text:        #f2f4f7;
+  --text-dim:    #a6adba;
+  --text-faint:  #6b7280;
+
+  /* Functional colours — meaning is load-bearing, not decorative */
+  --emerald:     #00e08a;  /* active / performance   */
+  --amber:       #ffb020;  /* nutrition              */
+  --violet:      #7c5cff;  /* strength               */
+  --cyan:        #38d6ff;  /* hydration / recovery   */
+  --crimson:     #ff3b5c;  /* warnings / peak zones  */
+
+  --emerald-dim: rgba(0, 224, 138, .14);
+  --amber-dim:   rgba(255, 176, 32, .14);
+  --violet-dim:  rgba(124, 92, 255, .14);
+  --cyan-dim:    rgba(56, 214, 255, .14);
+  --crimson-dim: rgba(255, 59, 92, .14);
+
+  /* Glass */
+  --glass:       rgba(16, 18, 24, .72);
+  --glass-line:  rgba(255, 255, 255, .06);
+  --blur:        saturate(140%) blur(18px);
+
+  /* Type */
+  --font-display: 'Syne', ui-sans-serif, system-ui, sans-serif;
+  --font-ui:      'Outfit', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono:    ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, monospace;
+
+  /* Scale */
+  --s1: 4px;  --s2: 8px;  --s3: 12px; --s4: 16px;
+  --s5: 24px; --s6: 32px; --s7: 48px; --s8: 64px;
+
+  --r1: 8px; --r2: 12px; --r3: 18px; --r4: 26px; --r-pill: 999px;
+
+  --dock-h: 68px;
+  --tap: 44px;           /* minimum touch target */
+  --maxw: 620px;         /* single-column reading width */
+
+  --dur-1: 120ms;
+  --dur-2: 220ms;
+  --ease: cubic-bezier(.22, .61, .36, 1);
+}
+
+/* High contrast mode — user-selectable in Settings, and honoured from the OS */
+:root[data-contrast="high"] {
+  --text:        #ffffff;
+  --text-dim:    #d7dce4;
+  --text-faint:  #9aa2af;
+  --line:        #4a5260;
+  --line-strong: #6d7686;
+  --surface-2:   #14161d;
+  --glass:       rgba(10, 11, 14, .94);
+  --blur:        none;
+}
+
+@media (prefers-contrast: more) {
+  :root:not([data-contrast="normal"]) {
+    --text: #ffffff;
+    --line: #4a5260;
+    --blur: none;
+  }
+}
+
+/* Reduced motion — user-selectable, and honoured from the OS */
+:root[data-motion="reduced"] * ,
+:root[data-motion="reduced"] *::before,
+:root[data-motion="reduced"] *::after {
+  animation-duration: 1ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 1ms !important;
+  scroll-behavior: auto !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion="full"]) *,
+  :root:not([data-motion="full"]) *::before,
+  :root:not([data-motion="full"]) *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+:root[data-text="large"] { font-size: 19px; }
