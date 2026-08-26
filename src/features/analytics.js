@@ -8,7 +8,7 @@
  * rolling average is the line that actually means something.
  */
 
-import { el, card, callout, fmt, colourVar, emptyState } from '../core/ui.js';
+import { el, card, callout, fmt, colourVar, emptyState, roadmapCard } from '../core/ui.js';
 import { db } from '../db/database.js';
 import { dateKeyOf } from '../db/repos.js';
 import { rollingAverage, sufficiency, adaptiveTdee } from '../engines/analytics.js';
@@ -296,6 +296,12 @@ export async function analyticsView({ params } = {}) {
       'Every chart here is built only from what you logged. Missing days are drawn as gaps, ' +
       'never as zeros — a day you did not weigh yourself is not a day you weighed nothing.',
       { tone: 'recovery' }) : null,
+    roadmapCard('Analytics', [
+      'Consistency heatmap — a GitHub-style daily grid across nutrition, workouts and hydration.',
+      'RPG character stat tree — logged volume translated into Strength, Endurance and Vitality attributes.',
+      'Streak shields — spend a rest-day shield to protect a streak, plus an automated weekly retrospective of splits, adherence and volume.',
+      'Ghost Viewfinder photo comparison — split-slider and timelapse against your Day 1 photo (Photos already captures and stores photos; the overlay guide and comparison views are still coming).',
+    ]),
   );
 }
 

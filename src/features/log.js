@@ -173,24 +173,73 @@ function quickBar() {
 
 /* ---- type grid ---------------------------------------------------------- */
 
+/* Swipe-select rather than a tile grid: one horizontally-snapping row, the
+   centred card is "selected", a second tap (or the button below) opens its
+   form. Scroll position drives selection so it works the same whether you
+   swipe, drag a scrollbar, or arrow-key through it. */
 function typeGrid() {
   const band = timeBand();
   const primary = TYPE_ORDER[band];
   const rest = Object.keys(LOG_TYPES).filter((t) => !primary.includes(t));
   const ordered = [...primary, ...rest];
 
-  const grid = el('div', { class: 'type-grid' },
-    ...ordered.map((type) => el('button', {
-      class: 'type-btn', style: tint(LOG_TYPES[type].colour),
-      onclick: () => openForm(type)
-    },
-      glyph(type),
-      el('span', { class: 'lbl' }, LOG_TYPES[type].label),
-      LOG_TYPES[type].unit ? el('span', { class: 'sub' }, LOG_TYPES[type].unit) : null
-    ))
-  );
+  let selected = ordered[0];
+  const track = el('div', { class: 'type-slider', role: 'listbox', 'aria-label': 'Log type — swipe to choose' });
 
-  return card('By type', { note: `Ordered for ${band}` }, grid);
+  const select = (type) => {
+    selected = type;
+    for (const c of track.children) {
+      const isSel = c.dataset.type === type;
+      c.classList.toggle('is-selected', isSel);
+      c.setAttribute('aria-selected', String(isSel));
+    }
+    openBtn.textContent = `Log ${LOG_TYPES[type].label.toLowerCase()}`;
+  };
+
+  const cards = ordered.map((type) => el('button', {
+    class: 'type-slide',
+    style: tint(LOG_TYPES[type].colour),
+    role: 'option',
+    dataset: { type },
+    onclick: () => {
+      if (selected === type) { openForm(type); return; }
+      select(type);
+      track.children[ordered.indexOf(type)]?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    }
+  },
+    glyph(type),
+    el('span', { class: 'lbl' }, LOG_TYPES[type].label),
+    LOG_TYPES[type].unit ? el('span', { class: 'sub' }, LOG_TYPES[type].unit) : null
+  ));
+  track.append(...cards);
+
+  /* Debounced via rAF so a fast swipe doesn't fire this on every scroll tick —
+     only settles once per frame, checking whichever card is nearest centre. */
+  let raf = null;
+  track.addEventListener('scroll', () => {
+    if (raf) return;
+    raf = requestAnimationFrame(() => {
+      raf = null;
+      const mid = track.getBoundingClientRect().left + track.getBoundingClientRect().width / 2;
+      let closest = null, closestDist = Infinity;
+      for (const c of track.children) {
+        const r = c.getBoundingClientRect();
+        const d = Math.abs((r.left + r.width / 2) - mid);
+        if (d < closestDist) { closestDist = d; closest = c; }
+      }
+      if (closest && closest.dataset.type !== selected) select(closest.dataset.type);
+    });
+  }, { passive: true });
+
+  const openBtn = el('button', {
+    class: 'btn btn-primary', style: { marginTop: 'var(--s3)', width: '100%' },
+    onclick: () => openForm(selected)
+  }, `Log ${LOG_TYPES[selected].label.toLowerCase()}`);
+
+  select(selected);
+
+  return card('By type', { note: `Ordered for ${band} — swipe to choose` },
+    el('div', { class: 'stack' }, track, openBtn));
 }
 
 /* ---- per-type forms ----------------------------------------------------- */

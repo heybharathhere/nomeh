@@ -90,15 +90,27 @@ button, input, select, textarea { font: inherit; color: inherit; }
   font-size: .74rem; color: var(--text-faint);
 }
 
-.net {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 4px 9px; border-radius: var(--r-pill);
+.profile-pill {
+  position: relative;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px;
+  border-radius: 50%;
   border: 1px solid var(--line); background: var(--surface-2);
-  font-size: .7rem; letter-spacing: .04em; text-transform: uppercase;
+  text-decoration: none; color: var(--text);
+  font-family: var(--font-display); font-weight: 700; font-size: .82rem;
+  transition: border-color var(--dur-2) var(--ease);
 }
-.net .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--emerald); }
-.net[data-state="offline"] { border-color: var(--line-strong); color: var(--text-dim); }
-.net[data-state="offline"] .dot { background: var(--text-faint); }
+.profile-pill:hover, .profile-pill:focus-visible { border-color: var(--emerald); }
+.profile-avatar { line-height: 1; }
+/* Only surfaces when offline — online is the expected default and does not
+   need to shout about itself; offline is the state worth a glance. */
+.net-dot {
+  position: absolute; right: -1px; bottom: -1px;
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--emerald); border: 2px solid var(--void);
+  opacity: 0; transition: opacity var(--dur-2) var(--ease), background var(--dur-2) var(--ease);
+}
+.net-dot[data-state="offline"] { opacity: 1; background: var(--text-faint); }
 
 .view { animation: rise var(--dur-2) var(--ease) both; }
 @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
@@ -126,6 +138,10 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .card-head { display: flex; align-items: baseline; gap: var(--s3); margin-bottom: var(--s3); }
 .card-head h2, .card-head h3 { font-size: 1rem; }
 .card-note { font-size: .78rem; color: var(--text-faint); }
+
+.roadmap-card { border-style: dashed; }
+.roadmap-list { display: grid; gap: var(--s2); padding-left: 1.1em; }
+.roadmap-list li { font-size: .84rem; color: var(--text-dim); }
 
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s3); }
 @media (max-width: 380px) { .grid-2 { grid-template-columns: 1fr; } }
@@ -277,6 +293,36 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .type-btn .lbl { font-size: .82rem; font-weight: 600; }
 .type-btn .sub { font-size: .68rem; color: var(--text-faint); }
 
+/* ---------- Log type slider (swipe-select, replaces the tile grid) ------- */
+
+.type-slider {
+  display: flex; gap: var(--s3);
+  overflow-x: auto; scroll-snap-type: x mandatory;
+  padding: var(--s2) calc(50% - 44px); /* first/last card can still reach centre */
+  margin: 0 calc(var(--s4) * -1);
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.type-slider::-webkit-scrollbar { display: none; }
+.type-slide {
+  flex: 0 0 auto; scroll-snap-align: center;
+  display: grid; gap: 6px; place-items: center;
+  width: 88px; min-height: 84px; padding: var(--s3) var(--s2);
+  border: 1px solid var(--line); border-radius: var(--r3);
+  background: var(--surface-3); cursor: pointer; text-align: center;
+  opacity: .55; transform: scale(.88);
+  transition: opacity var(--dur-2) var(--ease), transform var(--dur-2) var(--ease),
+              border-color var(--dur-2) var(--ease), background var(--dur-2) var(--ease);
+}
+.type-slide .glyph { width: 22px; height: 22px; color: var(--c); }
+.type-slide .lbl { font-size: .78rem; font-weight: 600; }
+.type-slide .sub { font-size: .66rem; color: var(--text-faint); }
+.type-slide.is-selected {
+  opacity: 1; transform: scale(1.08);
+  border-color: color-mix(in srgb, var(--c) 65%, var(--line));
+  background: var(--c-dim);
+}
+
 /* ---------- Timeline ---------- */
 
 .day { display: grid; gap: var(--s2); }
@@ -302,39 +348,68 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 /* ---------- Dock ---------- */
 
+/* A floating glass pill, not a full-width bar: capped at 340px so it stays a
+   thumb-reachable island rather than spanning edge to edge on wide phones. */
 .dock {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
-  padding: var(--s2) var(--s3) calc(var(--s2) + env(safe-area-inset-bottom));
+  position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 14px);
+  transform: translateX(-50%);
+  z-index: 40;
+  width: min(340px, calc(100% - var(--s5)));
+  height: 72px;
+  padding: 0 var(--s3);
   background: var(--glass);
   backdrop-filter: var(--blur);
   -webkit-backdrop-filter: var(--blur);
-  border-top: 1px solid var(--glass-line);
+  border: 1px solid var(--glass-line);
+  border-radius: var(--r-pill);
+  box-shadow: 0 14px 34px rgba(2, 3, 5, .5), inset 0 1px 0 rgba(255, 255, 255, .04);
 }
 .dock-inner {
-  max-width: var(--maxw); margin: 0 auto;
-  display: grid; grid-template-columns: repeat(5, 1fr); align-items: end; gap: 2px;
+  height: 100%; width: 100%;
+  display: flex; align-items: center; justify-content: space-between;
 }
 .dock a {
-  display: grid; gap: 3px; place-items: center;
-  min-height: 52px; padding: 6px 2px;
-  border-radius: var(--r2);
+  position: relative;
+  display: grid; place-items: center;
+  flex: 0 0 auto;
+  padding: 10px;
   color: var(--text-faint); text-decoration: none;
-  font-size: .64rem; letter-spacing: .03em; text-transform: uppercase; font-weight: 600;
+  transition: transform var(--dur-2) var(--ease), color var(--dur-2) var(--ease);
 }
-.dock a svg { width: 20px; height: 20px; }
-.dock a[aria-current="page"] { color: var(--emerald); }
-.dock a[aria-current="page"] .ink { background: var(--emerald); }
-.dock .ink { width: 14px; height: 2px; border-radius: 2px; background: transparent; }
+/* Icon-only pill: the persistent uppercase caption is gone, the magnify +
+   glow on the active tab carries that meaning instead. aria-label keeps it
+   readable to assistive tech. */
+.dock a svg {
+  width: 18px; height: 18px;
+  transition: width var(--dur-2) var(--ease), height var(--dur-2) var(--ease),
+              filter var(--dur-2) var(--ease);
+}
+.dock a[aria-current="page"] {
+  color: var(--emerald);
+}
+.dock a[aria-current="page"] svg {
+  width: 58px; height: 58px;
+  filter: drop-shadow(0 0 8px rgba(16, 224, 140, .65)) drop-shadow(0 0 20px rgba(16, 224, 140, .4));
+}
 
-/* The LOG action sits in the dock centre and is the app's primary verb. */
+/* The LOG action sits in the dock centre and is the app's primary verb —
+   still magnifies/lifts like the others when active, but keeps its filled
+   emerald treatment so it reads as the one-tap action even at rest. */
 .dock .log-action {
   color: #04130c;
   background: var(--emerald);
-  border-radius: var(--r-pill);
-  min-height: 52px;
-  align-self: center;
+  border-radius: 50%;
+  width: 48px; height: 48px;
+  padding: 0;
 }
-.dock .log-action .ink { display: none; }
+.dock .log-action svg { width: 22px; height: 22px; }
+.dock .log-action[aria-current="page"] {
+  width: 58px; height: 58px;
+}
+.dock .log-action[aria-current="page"] svg {
+  width: 26px; height: 26px;
+  filter: none;
+}
 
 /* ---------- Sheet ---------- */
 

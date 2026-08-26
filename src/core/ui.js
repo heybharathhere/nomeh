@@ -304,6 +304,21 @@ export function callout(text, { tone = 'cyan', strongText } = {}) {
   );
 }
 
+/* A visible, honest placeholder for a feature that is spec'd but not yet
+   built — used so a tab reads as "here's what's coming" rather than either
+   silently missing something or faking a feature that doesn't work yet.
+   Each item is a plain string description; nothing here is clickable. */
+export function roadmapCard(titleText, items) {
+  if (!items?.length) return null;
+  return el('section', { class: 'card roadmap-card' },
+    el('div', { class: 'card-head' },
+      el('h2', {}, titleText),
+      el('span', { class: 'card-note spacer' }, 'Coming to this tab')),
+    el('ul', { class: 'roadmap-list' },
+      ...items.map((text) => el('li', {}, text)))
+  );
+}
+
 export function field(label, control, hint) {
   const id = control.id || `f${Math.random().toString(36).slice(2, 8)}`;
   control.id = id;

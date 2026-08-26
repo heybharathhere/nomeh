@@ -72,6 +72,7 @@ async function boot() {
   await loadPrefs();
   buildDock();
   wireNetworkStatus();
+  wireProfilePill();
   wireDatabaseGuard();
   registerRoutes();
   startRouter();
@@ -137,11 +138,16 @@ const ICONS = {
   route: 'M6 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm12-10a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM8 17c6 0 8-2 8-6',
   moon: 'M20 14a8 8 0 1 1-9-11 7 7 0 0 0 9 11z',
   chart: 'M4 20V10M10 20V4M16 20v-7M22 20H2',
+  gear: 'M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM19.4 13a7.4 7.4 0 0 0 0-2l2-1.5-2-3.4-2.3.9a7.6 7.6 0 0 0-1.7-1L15 3.5H9l-.4 2.5a7.6 7.6 0 0 0-1.7 1l-2.3-.9-2 3.4L4.6 11a7.4 7.4 0 0 0 0 2l-2 1.5 2 3.4 2.3-.9c.5.4 1.1.8 1.7 1l.4 2.5h6l.4-2.5a7.6 7.6 0 0 0 1.7-1l2.3.9 2-3.4-2-1.5z',
 };
 
 /* The dock is generated rather than written into index.html, so turning a
    feature off in config genuinely removes its tab instead of leaving a link to
-   a screen that explains it is disabled. */
+   a screen that explains it is disabled.
+
+   Visually this is a floating glass pill (see .dock in app.css), icon-only —
+   the active tab's icon is what carries the label now (via aria-label for
+   screen readers), magnified and lifted rather than captioned. */
 function buildDock() {
   const dock = document.getElementById('dock');
   if (!dock) return;
@@ -166,26 +172,86 @@ function buildDock() {
     inner.append(el('a', {
       href: `#/${item.route}`,
       dataset: { route: item.route },
-      class: item.primary ? 'log-action' : '',
+      class: item.primary ? 'log-action' : 'dock-tab',
       'aria-label': item.label,
-    }, svg, item.primary ? null : el('span', {}, item.label)));
+    }, svg));
   }
 
   dock.replaceChildren(inner);
+  wireDockMagnify(dock, inner);
+}
+
+/* Continuous thumb-glide magnification (macOS-dock-style). As a pointer or
+   touch moves across the pill, nearby icons grow toward PEAK_PX with a slight
+   lift, falling off smoothly with distance; the active route always sits at
+   ACTIVE_PX regardless of pointer position. Inline styles are cleared on
+   release so the CSS defaults (BASE_PX, and ACTIVE_PX for [aria-current])
+   take back over — nothing here fights the router's own aria-current sync. */
+function wireDockMagnify(dock, inner) {
+  const BASE_PX = 18;
+  const PEAK_PX = 40;
+  const ACTIVE_PX = 58;
+  const RADIUS = 60; // px of horizontal falloff either side of the pointer
+
+  const links = () => [...inner.querySelectorAll('a')];
+
+  function apply(clientX) {
+    for (const a of links()) {
+      const isActive = a.getAttribute('aria-current') === 'page';
+      /* The centre LOG button is a fixed filled circle (see .log-action in
+         app.css) — its own width/height already respond to aria-current, and
+         resizing its inner glyph would make the icon overflow the circle. It
+         still takes part in the glide via translateY, just not icon scale. */
+      const isLogAction = a.classList.contains('log-action');
+      const r = a.getBoundingClientRect();
+      const center = r.left + r.width / 2;
+      const falloff = Math.max(0, 1 - Math.abs(clientX - center) / RADIUS);
+
+      if (isActive) {
+        a.style.transform = 'translateY(-4px)';
+        if (!isLogAction) {
+          const svg = a.querySelector('svg');
+          if (svg) svg.style.width = svg.style.height = `${ACTIVE_PX}px`;
+        }
+        continue;
+      }
+
+      a.style.transform = `translateY(${-3 * falloff}px)`;
+      if (!isLogAction) {
+        const svg = a.querySelector('svg');
+        const size = BASE_PX + (PEAK_PX - BASE_PX) * falloff;
+        if (svg) svg.style.width = svg.style.height = `${size}px`;
+      }
+    }
+  }
+
+  function reset() {
+    for (const a of links()) {
+      const svg = a.querySelector('svg');
+      if (svg && !a.classList.contains('log-action')) { svg.style.width = ''; svg.style.height = ''; }
+      a.style.transform = '';
+    }
+  }
+
+  inner.addEventListener('pointermove', (e) => apply(e.clientX));
+  inner.addEventListener('pointerdown', (e) => apply(e.clientX));
+  inner.addEventListener('pointerup', reset);
+  inner.addEventListener('pointerleave', reset);
+  inner.addEventListener('touchmove', (e) => { if (e.touches[0]) apply(e.touches[0].clientX); }, { passive: true });
+  inner.addEventListener('touchend', reset);
+  inner.addEventListener('touchcancel', reset);
 }
 
 /* ------------------------------------------------------------ status ----- */
 
 function wireNetworkStatus() {
-  const pill = document.getElementById('net');
-  const label = document.getElementById('net-label');
-  if (!pill || !label) return;
+  const dot = document.getElementById('net-dot');
+  if (!dot) return;
 
   const sync = () => {
     const online = navigator.onLine;
-    pill.dataset.state = online ? 'online' : 'offline';
-    label.textContent = online ? 'Online' : 'Offline';
-    pill.title = online
+    dot.dataset.state = online ? 'online' : 'offline';
+    dot.title = online
       ? 'Connected. NoMeh! still stores everything locally.'
       : 'No connection. Everything continues to work.';
   };
@@ -193,6 +259,27 @@ function wireNetworkStatus() {
   window.addEventListener('online', () => { sync(); toast('Back online. Nothing was waiting to sync — there is no sync.', { tone: 'cyan' }); });
   window.addEventListener('offline', () => { sync(); toast('Offline. Carry on.', { tone: 'cyan' }); });
   sync();
+}
+
+/* Top-right avatar in place of the old "ONLINE" badge. Refreshes on boot and
+   whenever Profile.save() fires its 'nomeh:profile' event, so editing your
+   name in Settings updates the initial without needing a reload. */
+function wireProfilePill() {
+  const avatar = document.getElementById('profile-avatar');
+  if (!avatar) return;
+
+  const paint = async () => {
+    try {
+      const profile = await Profile.get();
+      const initial = profile?.name?.trim()?.[0]?.toUpperCase();
+      avatar.textContent = initial || '?';
+    } catch {
+      avatar.textContent = '?';
+    }
+  };
+
+  window.addEventListener('nomeh:profile', paint);
+  paint();
 }
 
 /* Another tab upgraded the schema. Running against a closed handle would throw

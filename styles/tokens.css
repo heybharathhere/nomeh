@@ -48,7 +48,7 @@
 
   --r1: 8px; --r2: 12px; --r3: 18px; --r4: 26px; --r-pill: 999px;
 
-  --dock-h: 68px;
+  --dock-h: 86px;  /* 72px pill + 14px float offset from safe area */
   --tap: 44px;           /* minimum touch target */
   --maxw: 620px;         /* single-column reading width */
 

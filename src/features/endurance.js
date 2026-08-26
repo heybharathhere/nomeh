@@ -20,7 +20,7 @@
  * the run you already did.
  */
 
-import { el, card, callout, fmt, tint, colourVar, emptyState, sheet, field, toast, clear } from '../core/ui.js';
+import { el, card, callout, fmt, tint, colourVar, emptyState, sheet, field, toast, clear, roadmapCard } from '../core/ui.js';
 import { db, getSetting, setSetting } from '../db/database.js';
 import { Activities, RoutePoints, dateKeyOf } from '../db/repos.js';
 import { acceptPoint, processTrack, splits, paceSecPerKm, speedKmh,
@@ -615,5 +615,13 @@ export async function enduranceView() {
       title: 'No geolocation in this browser',
       message: gpsCap?.note ?? 'GPS needs a secure (HTTPS) origin and a browser that supports it. GPX import still works.',
     }) : null,
+    roadmapCard('Outdoor', [
+      'Live GPS mapping — routes rendered on OpenStreetMap via Leaflet with polyline path tracing, replacing the numeric HUD only view.',
+      'Auto-pause — freezes moving-time and pace when speed drops below 2 km/h.',
+      'Ghost pacer — visual/audio cues for whether you are ahead of or behind a target split or PR.',
+      'Cadence audio metronome — rhythmic tempo beats (160–180 SPM) via Web Audio API.',
+      'Segment PR detector on marked route segments.',
+      'Emergency live beacon — 1-tap SMS link with your live GPS coordinates and battery level.',
+    ]),
   );
 }

@@ -8,12 +8,12 @@
  * session to any of those, which on a phone are not edge cases.
  */
 
-import { el, card, fmt, tint, colourVar, emptyState, sheet, field, toast, clear } from '../core/ui.js';
+import { el, card, fmt, tint, colourVar, emptyState, sheet, field, toast, clear, roadmapCard } from '../core/ui.js';
 import { db, getSetting, setSetting } from '../db/database.js';
 import { Workouts, WorkoutSets, Exercises, PRs, dateKeyOf } from '../db/repos.js';
 import { oneRepMaxRange, volumeLoad, detectPRs, suggestProgression,
          sessionLoad, setKind, restFor } from '../engines/training.js';
-import { FEATURES, TRAINING } from '../config/app.config.js';
+import { FEATURES, TRAINING, enabled } from '../config/app.config.js';
 import { refresh } from '../core/router.js';
 
 const ACTIVE_KEY = 'training.activeWorkoutId';
@@ -473,6 +473,15 @@ async function progressionCard() {
 
 /* ----------------------------------------------------------------- view --- */
 
+/* Workout and Outdoor share this tab now (runs/rides are movement same as
+   lifting is) — this is the link across to the full GPS/endurance screen,
+   which still exists on its own route and keeps all of its functionality. */
+function outdoorPeek() {
+  if (!enabled('endurance')) return null;
+  return el('a', { class: 'chip-row', href: '#/endurance', style: { textDecoration: 'none' } },
+    el('span', { class: 'chip chip-btn' }, 'Runs & rides →'));
+}
+
 export async function trainView() {
   if (!FEATURES.strength) {
     return card('Training is switched off', {},
@@ -485,14 +494,17 @@ export async function trainView() {
 
   if (active) {
     return el('div', { class: 'stack' },
+      outdoorPeek(),
       await activeSessionCard(active),
       await historyCard(),
+      workoutRoadmap(),
     );
   }
 
   const programs = await db().programs.filter((p) => !p.deletedAt).toArray();
 
   return el('div', { class: 'stack' },
+    outdoorPeek(),
     card('Start training', { note: `${exerciseCount} exercises in your library` },
       el('div', { class: 'row-actions' },
         el('button', {
@@ -513,7 +525,16 @@ export async function trainView() {
       title: 'No exercises',
       message: 'The library seeds itself on first run. If it is empty, re-seed from Settings → Data.',
     }) : null,
+    workoutRoadmap(),
   );
+}
+
+function workoutRoadmap() {
+  return roadmapCard('Workout', [
+    'Interactive dual-gender anatomical muscle selector — tap a muscle group on a front/back body silhouette to filter the exercise library, instead of the text search above.',
+    'Recovery heatmap — a 2D muscle-group map of fatigue and readiness, built from your logged volume.',
+    'Pre-workout cognitive fatigue slider and eccentric/concentric tempo bars in the set logger.',
+  ]);
 }
 
 function openProgramPicker(programs) {

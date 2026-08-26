@@ -60,6 +60,7 @@ export async function settingsView() {
    Entries whose feature flag is off are omitted entirely. */
 const SECONDARY = [
   { route: 'endurance', label: 'Runs & rides', hint: 'GPS tracking, GPX import', feature: 'endurance' },
+  { route: 'body', label: 'Body', hint: 'Measurements and circumference tracking', feature: 'measurements' },
   { route: 'recovery', label: 'Recovery', hint: 'Sleep, readiness, training load', feature: 'recovery' },
   { route: 'analytics', label: 'Analytics', hint: 'Trends and correlations', feature: 'analytics' },
   { route: 'photos', label: 'Progress photos', hint: 'Stored on this device only', feature: 'photos' },

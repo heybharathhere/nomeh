@@ -33,10 +33,13 @@
   <header class="topbar">
     <span class="brand">NoMeh<em>!</em></span>
     <div class="topbar-meta">
-      <span class="net" id="net" data-state="online" title="Network status">
-        <span class="dot" aria-hidden="true"></span>
-        <span id="net-label">Online</span>
-      </span>
+      <!-- Network status still exists (see wireNetworkStatus in main.js) — it
+           now lives as a small dot on the profile pill instead of its own
+           "ONLINE" badge, since that badge's spot is the profile entry point. -->
+      <a class="profile-pill" id="profile-pill" href="#/settings" aria-label="Profile and settings">
+        <span class="profile-avatar" id="profile-avatar" aria-hidden="true">?</span>
+        <span class="net-dot" id="net-dot" data-state="online" title="Network status" aria-hidden="true"></span>
+      </a>
     </div>
   </header>
 

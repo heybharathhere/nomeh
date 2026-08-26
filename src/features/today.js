@@ -5,7 +5,7 @@
  * lives one tap away in Body or Timeline.
  */
 
-import { el, card, metricBar, callout, fmt, tint, emptyState } from '../core/ui.js';
+import { el, card, metricBar, callout, fmt, tint, emptyState, roadmapCard } from '../core/ui.js';
 import { Logs, Profile, dateKeyOf, dateKeyOffset } from '../db/repos.js';
 import { getSetting } from '../db/database.js';
 import { dailyTotals, currentStreak, sufficiency, seriesByDay, rollingAverage } from '../engines/analytics.js';
@@ -42,8 +42,13 @@ export async function todayView() {
       movement(totals),
       readiness(todayLogs, recent),
       weightTrend(recent, profile),
+      analyticsPeek(),
       todayLog(todayLogs, clock),
-      quickLinks()
+      quickLinks(),
+      roadmapCard('NoMeh', [
+        'Concentric progress rings — layered SVG gauges for calories, protein, carbs, fats and water, replacing the linear bars above.',
+        'Minimum Viable Workout — a 1-tap 5-minute fallback routine for low-energy days that still protects your streak.',
+      ])
     ].filter(Boolean)
   );
 
@@ -58,12 +63,26 @@ function quickLinks() {
     { route: 'recovery', label: 'Recovery', feature: 'recovery' },
     { route: 'analytics', label: 'Analytics', feature: 'analytics' },
     { route: 'photos', label: 'Photos', feature: 'photos' },
+    { route: 'body', label: 'Body', feature: 'measurements' },
     { route: 'timeline', label: 'Timeline' },
-    { route: 'settings', label: 'Settings' },
   ].filter((l) => enabled(l.feature));
 
   return el('div', { class: 'chip-row' },
     ...links.map((l) => el('a', { class: 'chip chip-btn', href: `#/${l.route}` }, l.label)));
+}
+
+/* This tab now doubles as "NoMeh" — Pulse and Analytics combined — so a link
+   across to the full Analytics screen lives here rather than only in
+   Settings. The full screen (trends, correlations, RPG stat tree, etc.) is
+   unchanged; this is a doorway to it, not a rebuild of it. */
+function analyticsPeek() {
+  if (!enabled('analytics')) return null;
+  return card('Analytics', {},
+    el('div', { class: 'stack' },
+      el('p', { class: 'card-note' }, 'Trends, correlations and your full history live here.'),
+      el('a', { class: 'btn btn-sm', href: '#/analytics' }, 'Open Analytics')
+    )
+  );
 }
 
 function greeting() {

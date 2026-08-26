@@ -89,7 +89,7 @@ export const DEFAULT_THEME = {
   radius: { r1: '8px', r2: '12px', r3: '18px', r4: '26px', pill: '999px' },
 
   layout: {
-    dockHeight: '68px',
+    dockHeight: '86px', // 72px floating pill + 14px offset from the safe area
     tapTarget: '44px',   // WCAG minimum; do not go below this
     maxWidth: '620px',   // single-column reading width
   },

@@ -6,7 +6,7 @@
  * it three weeks in.
  */
 
-import { el, card, callout, fmt, colourVar, metricBar, emptyState, sheet, field, toast, clear } from '../core/ui.js';
+import { el, card, callout, fmt, colourVar, metricBar, emptyState, sheet, field, toast, clear, roadmapCard } from '../core/ui.js';
 import { Profile, Meals, Hydration, dateKeyOf, dateKeyOffset } from '../db/repos.js';
 import { db, getSetting } from '../db/database.js';
 import { computeTargets } from '../engines/biomath.js';
@@ -470,6 +470,12 @@ export async function diaryView({ params } = {}) {
       title: 'Nothing logged yet',
       message: 'Add a food to any meal above. The first few entries build your database; after that logging is a couple of taps.',
     }) : null,
+    roadmapCard('Nutrition', [
+      'Custom recipe builder — combine raw ingredients into meals, with cooking-yield/moisture-loss and fermentation sugar-to-alcohol modifiers for accurate cooked macros.',
+      'Smart grocery checklist — 1-tap aggregation of ingredients from planned recipes into a categorized shopping list.',
+      'Smart leftover & expiry tracker — batch-dates your meal prep and alerts you before it spoils.',
+      'Electrolyte & deficiency alerts — post-workout sodium/fluid loss estimates and weekly iron/calcium/fibre shortfall flags.',
+    ]),
   );
 
   function go(next) {
