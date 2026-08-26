@@ -46,6 +46,10 @@ async function render() {
     view.replaceChildren();
     view.className = 'view';
     if (output) view.append(output);
+    /* The onboarding guard swaps content in without changing the URL (any
+       route redirects to setup if there's no profile yet), so the dock has
+       to react to what actually got rendered, not just the path. */
+    setChromeVisible(!(output?.dataset?.chrome === 'bare'));
   } catch (err) {
     /* A failing screen must not take the shell down with it (spec: never let
        one subsystem crash the app). The dock stays usable. */
@@ -75,8 +79,24 @@ function errorView(path, err) {
   return div;
 }
 
+/* Routes with no tab structure of their own. `/welcome` covers someone
+   navigating there directly; the more common case — any guarded route
+   redirecting to onboarding because there's no profile yet — is caught in
+   render() above via the rendered output's own marker, since the path
+   itself never changes in that case. */
+const BARE_ROUTES = new Set(['/welcome']);
+
+function setChromeVisible(visible) {
+  const dock = document.getElementById('dock');
+  if (dock) dock.hidden = !visible;
+  const profilePill = document.getElementById('profile-pill');
+  if (profilePill) profilePill.hidden = !visible;
+}
+
 function syncDock(path) {
   const top = `/${path.split('/')[1] || 'today'}`;
+  if (BARE_ROUTES.has(top)) setChromeVisible(false);
+
   for (const link of document.querySelectorAll('#dock a')) {
     const isCurrent = `/${link.dataset.route}` === top;
     if (isCurrent) link.setAttribute('aria-current', 'page');

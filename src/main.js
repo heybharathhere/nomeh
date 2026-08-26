@@ -19,12 +19,12 @@ import { UI, FEATURES, enabled } from './config/app.config.js';
 
 import { onboardingView } from './features/onboarding.js';
 import { todayView } from './tabs/nomeh/view.js';
-import { logView } from './features/log.js';
+import { logView } from './tabs/log/view.js';
 import { timelineView } from './features/timeline.js';
-import { bodyView } from './features/body.js';
+import { bodyView } from './tabs/body/view.js';
 import { settingsView } from './features/settings.js';
-import { diaryView } from './features/diary.js';
-import { trainView } from './features/train.js';
+import { diaryView } from './tabs/nutrition/view.js';
+import { trainView } from './tabs/workout/view.js';
 import { enduranceView } from './features/endurance.js';
 import { recoveryView } from './features/recovery.js';
 import { analyticsView } from './features/analytics.js';

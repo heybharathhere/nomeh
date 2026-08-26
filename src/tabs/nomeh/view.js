@@ -11,7 +11,7 @@ import { Logs, Profile, dateKeyOf, dateKeyOffset } from '../../db/repos.js';
 import { getSetting } from '../../db/database.js';
 import { dailyTotals, currentStreak, seriesByDay, rollingAverage, sufficiency, adaptiveTdee } from '../../engines/analytics.js';
 import { computeTargets } from '../../engines/biomath.js';
-import { describe } from '../../features/log.js';
+import { describe } from '../log/view.js';
 import { LOG_TYPES } from '../../engines/logparser.js';
 import { enabled } from '../../config/app.config.js';
 import { fmt, tint } from '../../core/ui.js';

@@ -10,7 +10,7 @@ import { el, card, fmt, tint, emptyState, toast, clear } from '../core/ui.js';
 import { Logs, dateKeyOf, dateKeyOffset } from '../db/repos.js';
 import { getSetting } from '../db/database.js';
 import { LOG_TYPES } from '../engines/logparser.js';
-import { describe } from './log.js';
+import { describe } from '../tabs/log/view.js';
 import { refresh } from '../core/router.js';
 import { dailyTotals } from '../engines/analytics.js';
 

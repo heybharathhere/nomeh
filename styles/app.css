@@ -116,17 +116,24 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 /* ---------- Onboarding: liquid step transitions ---------- */
 
-.onboard-step { animation: liquidIn .5s cubic-bezier(.22, 1, .36, 1) both; }
-.onboard-step.leaving { animation: liquidOut .32s cubic-bezier(.4, 0, 1, 1) both; }
+.onboard-step { animation: liquidIn .6s cubic-bezier(.19, 1, .22, 1) both; }
+.onboard-step.leaving { animation: liquidOut .38s cubic-bezier(.55, 0, 1, .45) both; }
 
+/* An organic blob morph (asymmetric border-radius animating through several
+   shapes), not a plain circular wipe — closer to how liquid actually moves:
+   it doesn't hold a perfect edge while it travels. */
 @keyframes liquidIn {
-  0%   { opacity: 0; transform: scale(.92) translateY(16px); filter: blur(7px); clip-path: circle(0% at 50% 15%); }
-  55%  { filter: blur(2px); }
-  100% { opacity: 1; transform: scale(1) translateY(0);      filter: blur(0);   clip-path: circle(150% at 50% 15%); }
+  0%   { opacity: 0; transform: scale(.82) translateY(26px); filter: blur(14px);
+         border-radius: 62% 38% 51% 49% / 42% 58% 44% 56%; }
+  35%  { border-radius: 44% 56% 63% 37% / 55% 40% 60% 45%; filter: blur(9px); }
+  65%  { opacity: 1; border-radius: 38% 62% 40% 60% / 60% 42% 58% 40%; filter: blur(3px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); filter: blur(0); border-radius: 0; }
 }
 @keyframes liquidOut {
-  0%   { opacity: 1; transform: scale(1) translateY(0);      filter: blur(0);   clip-path: circle(150% at 50% 15%); }
-  100% { opacity: 0; transform: scale(.94) translateY(-12px); filter: blur(8px); clip-path: circle(0% at 50% 15%); }
+  0%   { opacity: 1; transform: scale(1) translateY(0); filter: blur(0); border-radius: 0; }
+  40%  { border-radius: 40% 60% 42% 58% / 58% 40% 60% 42%; filter: blur(6px); }
+  100% { opacity: 0; transform: scale(.86) translateY(-22px); filter: blur(14px);
+         border-radius: 55% 45% 60% 40% / 40% 60% 38% 62%; }
 }
 
 .onboard-splash {

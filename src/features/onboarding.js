@@ -20,7 +20,7 @@ const draft = {
 };
 
 export function onboardingView() {
-  const host = el('div', { class: 'stack' });
+  const host = el('div', { class: 'stack', dataset: { chrome: 'bare' } });
   let step = 0;
 
   const steps = [intro, basics, body, goal, review];
@@ -129,7 +129,7 @@ function body({ next, back }) {
     weight.placeholder = metric ? '72.5' : '160';
     height.placeholder = metric ? '175' : '69';
     unitRow.replaceChildren(
-      ...[['metric', 'Metric · kg / km'], ['imperial', 'Imperial · lb / mi']].map(([v, l]) =>
+      ...[['metric', 'Metric · kg / cm'], ['imperial', 'Imperial · lb / in']].map(([v, l]) =>
         el('button', {
           class: 'chip', 'aria-pressed': String(draft.units === v),
           onclick: () => { draft.units = v; syncUnits(); }
