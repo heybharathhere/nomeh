@@ -113,6 +113,33 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .net-dot[data-state="offline"] { opacity: 1; background: var(--text-faint); }
 
 .view { animation: rise var(--dur-2) var(--ease) both; }
+
+/* ---------- Onboarding: liquid step transitions ---------- */
+
+.onboard-step { animation: liquidIn .5s cubic-bezier(.22, 1, .36, 1) both; }
+.onboard-step.leaving { animation: liquidOut .32s cubic-bezier(.4, 0, 1, 1) both; }
+
+@keyframes liquidIn {
+  0%   { opacity: 0; transform: scale(.92) translateY(16px); filter: blur(7px); clip-path: circle(0% at 50% 15%); }
+  55%  { filter: blur(2px); }
+  100% { opacity: 1; transform: scale(1) translateY(0);      filter: blur(0);   clip-path: circle(150% at 50% 15%); }
+}
+@keyframes liquidOut {
+  0%   { opacity: 1; transform: scale(1) translateY(0);      filter: blur(0);   clip-path: circle(150% at 50% 15%); }
+  100% { opacity: 0; transform: scale(.94) translateY(-12px); filter: blur(8px); clip-path: circle(0% at 50% 15%); }
+}
+
+.onboard-splash {
+  min-height: calc(100dvh - var(--dock-h) - var(--s7));
+  display: grid; place-items: center; text-align: center;
+  gap: var(--s5);
+}
+.onboard-wordmark {
+  font-family: var(--font-display); font-weight: 800;
+  font-size: clamp(2.6rem, 12vw, 3.6rem);
+  letter-spacing: -.01em;
+}
+.onboard-wordmark em { color: var(--emerald); font-style: normal; }
 @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
 .eyebrow {

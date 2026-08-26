@@ -10,6 +10,7 @@
 import { el, card, callout, fmt, tint, emptyState, sheet, field, toast } from '../core/ui.js';
 import { Logs, Goals, Profile, dateKeyOf, dateKeyOffset } from '../db/repos.js';
 import { seriesByDay, rollingAverage } from '../engines/analytics.js';
+import { ACTIVITY_FACTORS, GOALS as GOAL_DEFS } from '../engines/biomath.js';
 import { refresh } from '../core/router.js';
 
 const SITES = ['waist', 'chest', 'hip', 'neck', 'arm', 'thigh', 'calf', 'shoulders', 'forearm'];
@@ -26,11 +27,47 @@ export async function bodyView() {
   return el('div', { class: 'stack' },
     el('p', { class: 'eyebrow' }, 'Progression'),
     el('h1', { class: 'page-title' }, 'Body'),
+    profileCard(profile),
     weightCard(rows.filter((r) => r.type === 'weight'), from, to),
     measurementCard(rows.filter((r) => r.type === 'measurement')),
     goalsCard(goals),
     photosCard(),
     profile ? targetsCard(profile) : null
+  );
+}
+
+/* What onboarding collected, shown as-is — the same facts computeTargets()
+   already uses, just visible now instead of only feeding a formula. */
+function profileCard(profile) {
+  if (!profile) {
+    return card('Profile', {}, emptyState({
+      title: 'No profile yet',
+      message: 'Run setup from Settings to fill this in.'
+    }));
+  }
+
+  const activity = ACTIVITY_FACTORS[profile.activity]?.label ?? profile.activity;
+  const goal = GOAL_DEFS[profile.primaryGoal]?.label ?? profile.primaryGoal;
+  const sex = profile.sex ? profile.sex[0].toUpperCase() + profile.sex.slice(1) : null;
+
+  return card('Profile', { note: 'From setup' },
+    el('div', { class: 'stack' },
+      el('dl', { class: 'kv' },
+        sex ? el('dt', {}, 'Sex') : null,
+        sex ? el('dd', {}, sex) : null,
+        profile.ageYears ? el('dt', {}, 'Age') : null,
+        profile.ageYears ? el('dd', {}, `${profile.ageYears}`) : null,
+        profile.heightCm ? el('dt', {}, 'Height') : null,
+        profile.heightCm ? el('dd', {}, `${fmt.dec(profile.heightCm, 0)} cm`) : null,
+        profile.weightKg ? el('dt', {}, 'Starting weight') : null,
+        profile.weightKg ? el('dd', {}, `${fmt.dec(profile.weightKg, 1)} kg`) : null,
+        activity ? el('dt', {}, 'Activity') : null,
+        activity ? el('dd', {}, activity) : null,
+        goal ? el('dt', {}, 'Goal') : null,
+        goal ? el('dd', {}, goal) : null,
+      ),
+      el('a', { class: 'btn btn-ghost btn-sm', href: '#/settings' }, 'Edit in Settings')
+    )
   );
 }
 

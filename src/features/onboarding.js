@@ -26,12 +26,24 @@ export function onboardingView() {
   const steps = [intro, basics, body, goal, review];
 
   function paint() {
-    host.replaceChildren(
-      el('div', { class: 'steps', role: 'group', 'aria-label': `Step ${step + 1} of ${steps.length}` },
-        ...steps.map((_, i) => el('i', { class: i <= step ? 'on' : '' }))),
-      steps[step]({ next, back })
-    );
-    document.getElementById('main')?.focus({ preventScroll: true });
+    const dots = el('div', { class: 'steps', role: 'group', 'aria-label': `Step ${step + 1} of ${steps.length}` },
+      ...steps.map((_, i) => el('i', { class: i <= step ? 'on' : '' })));
+    const wrap = el('div', { class: 'onboard-step' }, steps[step]({ next, back }));
+
+    const old = host.querySelector('.onboard-step');
+    if (!old) {
+      host.replaceChildren(dots, wrap);
+      document.getElementById('main')?.focus({ preventScroll: true });
+      return;
+    }
+
+    /* Liquid exit, then swap, then the new step's own liquidIn animation
+       (declared on .onboard-step itself) plays automatically. */
+    old.classList.add('leaving');
+    old.addEventListener('animationend', () => {
+      host.replaceChildren(dots, wrap);
+      document.getElementById('main')?.focus({ preventScroll: true });
+    }, { once: true });
   }
   function next() { step = Math.min(steps.length - 1, step + 1); paint(); }
   function back() { step = Math.max(0, step - 1); paint(); }
@@ -43,21 +55,8 @@ export function onboardingView() {
 /* ------------------------------------------------------------ step 1 ----- */
 
 function intro({ next }) {
-  return el('div', { class: 'stack' },
-    el('p', { class: 'eyebrow' }, 'Welcome'),
-    el('h1', { class: 'page-title', style: { marginBottom: 'var(--s3)' } }, 'Everything stays here'),
-    el('p', { style: { color: 'var(--text-dim)', margin: '0 0 var(--s4)' } },
-      'NoMeh! keeps your log in a database inside this browser. There is no account, ' +
-      'no server, and nothing to sign up for. That also means nobody else can recover it for you, ' +
-      'so exporting a backup now and then is the one habit worth building.'),
-    card('What that buys you', {},
-      el('dl', { class: 'kv' },
-        el('dt', {}, 'Works with no signal'), el('dd', {}, 'Fully'),
-        el('dt', {}, 'Data sent anywhere'), el('dd', {}, 'None'),
-        el('dt', {}, 'Account needed'), el('dd', {}, 'No'),
-        el('dt', {}, 'Your data, exportable'), el('dd', {}, 'Any time')
-      )
-    ),
+  return el('div', { class: 'onboard-splash' },
+    el('h1', { class: 'onboard-wordmark' }, 'NoMeh', el('em', {}, '!')),
     el('button', { class: 'btn btn-primary btn-block', onclick: next }, 'Set up')
   );
 }
@@ -87,17 +86,14 @@ function basics({ next, back }) {
   );
 
   return el('div', { class: 'stack' },
-    el('p', { class: 'eyebrow' }, 'Step 1'),
+    el('p', { class: 'eyebrow' }, 'Step 1 of 4'),
     el('h1', { class: 'page-title' }, 'About you'),
-    field('Name', name, 'Only ever shown to you.'),
+    field('Name', name),
     field('Age', age),
     el('div', { class: 'field' },
       el('label', {}, 'Sex'),
       sexRow,
-      el('span', { class: 'hint' },
-        'The Mifflin-St Jeor equation was fitted on male and female groups only. ' +
-        '"Prefer not to say" averages the two constants, which is an approximation — ' +
-        'you can override every target later.')
+      el('span', { class: 'hint' }, 'Used for the estimate — override anytime.')
     ),
     el('div', { class: 'row' },
       el('button', { class: 'btn btn-ghost', onclick: back }, 'Back'),
@@ -143,14 +139,11 @@ function body({ next, back }) {
   syncUnits();
 
   return el('div', { class: 'stack' },
-    el('p', { class: 'eyebrow' }, 'Step 2'),
+    el('p', { class: 'eyebrow' }, 'Step 2 of 4'),
     el('h1', { class: 'page-title' }, 'Measurements'),
     el('div', { class: 'field' }, el('label', {}, 'Units'), unitRow),
     field('Weight', weight, wUnit.textContent),
     field('Height', height, hUnit.textContent),
-    callout('These two numbers drive the calorie, macro and hydration estimates. ' +
-            'You can change them any time, and NoMeh! keeps the history of what changed and when.',
-            { tone: 'cyan' }),
     el('div', { class: 'row' },
       el('button', { class: 'btn btn-ghost', onclick: back }, 'Back'),
       el('span', { class: 'spacer' }),
@@ -199,10 +192,9 @@ function goal({ next, back }) {
   );
 
   return el('div', { class: 'stack' },
-    el('p', { class: 'eyebrow' }, 'Step 3'),
-    el('h1', { class: 'page-title' }, 'What are you training for?'),
-    el('div', { class: 'field' }, el('label', {}, 'Primary goal'), goalGrid,
-      el('span', { class: 'hint' }, 'You can add more goals later, each with its own target and deadline.')),
+    el('p', { class: 'eyebrow' }, 'Step 3 of 4'),
+    el('h1', { class: 'page-title' }, 'Goal and activity'),
+    el('div', { class: 'field' }, el('label', {}, 'Primary goal'), goalGrid),
     el('div', { class: 'field' }, el('label', {}, 'Typical week'), activityWrap),
     el('div', { class: 'row' },
       el('button', { class: 'btn btn-ghost', onclick: back }, 'Back'),
@@ -229,12 +221,10 @@ function review({ back }) {
   ];
 
   return el('div', { class: 'stack' },
-    el('p', { class: 'eyebrow' }, 'Step 4'),
-    el('h1', { class: 'page-title' }, 'Your starting estimates'),
+    el('p', { class: 'eyebrow' }, 'Step 4 of 4'),
+    el('h1', { class: 'page-title' }, 'Your numbers'),
 
-    callout('Every figure below is a prediction from a population equation, not a measurement of you. ' +
-            'After a couple of weeks of logging, NoMeh! can compare them against what your body ' +
-            'actually did and adjust.', { tone: 'amber', strongText: 'These are estimates. ' }),
+    callout('Estimates — they adjust once you log for a couple of weeks.', { tone: 'amber' }),
 
     targets.calorieFloorApplied
       ? callout(`The goal-adjusted figure came out below ${targets.calorieFloor} kcal, so the target was ` +
@@ -254,7 +244,7 @@ function review({ back }) {
     el('div', { class: 'row' },
       el('button', { class: 'btn btn-ghost', onclick: back }, 'Back'),
       el('span', { class: 'spacer' }),
-      el('button', { class: 'btn btn-primary', onclick: () => finish(targets) }, 'Start logging')
+      el('button', { class: 'btn btn-primary', onclick: () => finish(targets) }, "Let's log")
     )
   );
 }

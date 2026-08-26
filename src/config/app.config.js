@@ -424,18 +424,19 @@ export const UI = {
   /* Five tabs: Today (Pulse dashboard, with Analytics surfaced inline),
      Nutrition (food diary), Log (centre — quick-add, slide-select rather than
      a tile grid), Workout (training, with Outdoor/GPS surfaced inline), and
-     Settings (device, data, profile). Body and the full Analytics/Outdoor
-     screens still exist and are reachable from within Today/Workout/Settings
-     — moving out of the dock is not the same as removing them. */
+     Body (measurements, weight trend, onboarding profile facts). Settings is
+     reached from the profile pill (top-right), not the dock — still fully
+     routed, just not one of the five tabs. */
   nav: [
     { route: 'today',    label: 'NoMeh',      icon: 'pulse' },
     { route: 'diary',    label: 'Nutrition',  icon: 'plate',    feature: 'nutrition' },
     { route: 'log',      label: 'Log',        icon: 'plus',     primary: true },
     { route: 'train',    label: 'Workout',    icon: 'dumbbell' },
-    { route: 'settings', label: 'Settings',   icon: 'gear' },
+    { route: 'body',     label: 'Body',       icon: 'body' },
   ],
-  /* Extra destinations reachable from Today, Workout and Settings but not the dock. */
-  secondaryNav: ['timeline', 'analytics', 'recovery', 'photos', 'body', 'endurance'],
+  /* Settings now lives behind the profile pill (top-right), not the dock —
+     it is still fully routed, just not one of the five tabs. */
+  secondaryNav: ['timeline', 'analytics', 'recovery', 'photos', 'settings', 'endurance'],
 
   toastMs: 3200,
   undoMs: 7000,          // how long an undo offer stays available
