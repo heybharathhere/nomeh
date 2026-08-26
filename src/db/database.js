@@ -52,6 +52,8 @@ export const SOFT_DELETE_TABLES = [
   'programs', 'activities', 'bikes', 'sleep', 'measurements', 'photos',
 ];
 
+let dbInstance;
+
 export async function openDatabase() {
   if (dbInstance) return dbInstance;
 
