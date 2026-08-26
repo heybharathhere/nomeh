@@ -1,160 +1,361 @@
+/* Progress photos.
+ *
+ * WHERE THE IMAGES LIVE
+ *   In IndexedDB, as Blobs, on this device. They are never uploaded anywhere —
+ *   there is no server to upload them to. That is the entire privacy model, and
+ *   it is why the backup file has an option to exclude them: a JSON export with
+ *   200 MB of base64 images in it is not a file anyone can actually use.
+ *
+ * TWO REAL CONSTRAINTS
+ *   1. Safari has a long history of bugs storing Blobs in IndexedDB. Writes are
+ *      verified by reading back immediately, so a silent failure surfaces at
+ *      capture time rather than being discovered when the photo is gone.
+ *   2. iOS evicts IndexedDB for sites unused for seven days unless the app is
+ *      installed to the Home Screen. For photos specifically this means real
+ *      loss, so the storage card says so plainly.
+ *
+ * THE GHOST OVERLAY
+ *   The previous photo is drawn over the live camera at low opacity so you can
+ *   line up the same distance and angle. Without it, month-to-month comparison
+ *   photos differ more by camera position than by body composition, which makes
+ *   the whole exercise worthless.
+ */
+
+import { el, card, callout, fmt, emptyState, sheet, field, toast, confirmDestructive } from '../core/ui.js';
 import { db } from '../db/database.js';
+import { Photos, PhotoBlobs, dateKeyOf } from '../db/repos.js';
+import { PHOTOS, FEATURES } from '../config/app.config.js';
+import { refresh } from '../core/router.js';
 
-export const PhotosFeature = {
-  stream: null,
-  facingMode: 'environment',
-  ghostOpacity: 0.4,
-  dayOnePhotoUrl: null,
+/* ------------------------------------------------------------- encoding --- */
 
-  async render(container) {
-    const allPhotos = (await db.progressPhotos.toArray().catch(() => [])) || [];
-    const baseline = allPhotos.find(p => p.isBaseline) || allPhotos[0];
-    this.dayOnePhotoUrl = baseline ? baseline.dataUrl : null;
+/* Resize and re-encode before storing. A modern phone camera produces 4–8 MB
+   per shot; at these settings the same image is 80–200 KB, which is the
+   difference between a year of photos fitting in a browser quota and not. */
+async function processImage(source) {
+  const bitmap = typeof createImageBitmap === 'function'
+    ? await createImageBitmap(source)
+    : await loadViaImg(source);
 
-    container.innerHTML = `
-      <div class="space-y-4 select-none">
-        <div class="flex justify-between items-center">
-          <div>
-            <span class="text-[10px] font-mono tracking-widest text-[#00F59B] uppercase">GHOST VIEWFINDER</span>
-            <h2 class="font-syne text-xl font-bold text-white">Physique Progression</h2>
-          </div>
-          <button id="toggleCameraFacingBtn" class="p-2.5 rounded-2xl glass-card border border-white/10 text-white active:scale-95 transition-all">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-          </button>
-        </div>
+  const scale = Math.min(1, PHOTOS.maxEdgePx / Math.max(bitmap.width, bitmap.height));
+  const w = Math.round(bitmap.width * scale);
+  const h = Math.round(bitmap.height * scale);
 
-        <div class="relative w-full aspect-[3/4] bg-black rounded-[32px] overflow-hidden border border-white/10 shadow-2xl">
-          <video id="cameraFeed" autoplay playsinline muted class="absolute inset-0 w-full h-full object-cover"></video>
-          <img id="ghostOverlayImg" src="${this.dayOnePhotoUrl || ''}" class="absolute inset-0 w-full h-full object-cover pointer-events-none transition-opacity ${this.dayOnePhotoUrl ? '' : 'hidden'}" style="opacity: ${this.ghostOpacity}; filter: grayscale(1) contrast(1.2);">
-          <div class="absolute inset-0 pointer-events-none grid grid-cols-3 grid-rows-3 border border-white/5">
-            <div class="border-r border-b border-white/5"></div><div class="border-r border-b border-white/5"></div><div class="border-b border-white/5"></div>
-            <div class="border-r border-b border-white/5"></div><div class="border-r border-b border-white/5 flex items-center justify-center"><div class="w-2.5 h-2.5 rounded-full border border-[#00F59B]/60"></div></div><div class="border-b border-white/5"></div>
-            <div class="border-r border-white/5"></div><div class="border-r border-white/5"></div><div></div>
-          </div>
-          <canvas id="photoCaptureCanvas" class="hidden"></canvas>
-        </div>
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(bitmap, 0, 0, w, h);
+  bitmap.close?.();
 
-        ${this.dayOnePhotoUrl ? `
-          <div class="glass-card p-3 rounded-2xl flex items-center gap-3">
-            <span class="text-[10px] font-mono text-slate-400 uppercase">GHOST</span>
-            <input type="range" id="ghostOpacitySlider" min="0" max="1" step="0.05" value="${this.ghostOpacity}" class="w-full accent-[#00F59B] h-1.5 bg-black rounded-lg appearance-none cursor-pointer">
-            <span id="ghostPctLabel" class="text-xs font-mono text-[#00F59B] w-8">${Math.round(this.ghostOpacity * 100)}%</span>
-          </div>
-        ` : ''}
+  /* WebP where available, JPEG where not — Safari only gained WebP encoding
+     recently, and toBlob silently falls back to PNG if the type is unsupported,
+     which would be far larger than either. */
+  const blob = await new Promise((resolve) => {
+    canvas.toBlob((b) => resolve(b), PHOTOS.format, PHOTOS.quality);
+  });
 
-        <div class="flex justify-center pt-1">
-          <button id="snapPhotoBtn" class="w-20 h-20 rounded-full border-4 border-[#00F59B] p-1 flex items-center justify-center active:scale-90 transition-transform shadow-[0_0_25px_rgba(0,245,155,0.3)]">
-            <div class="w-full h-full bg-white rounded-full"></div>
-          </button>
-        </div>
+  if (blob && blob.type === PHOTOS.format) return { blob, width: w, height: h };
 
-        <div id="comparisonContainer" class="pt-2"></div>
-      </div>
-    `;
+  const jpeg = await new Promise((resolve) => {
+    canvas.toBlob((b) => resolve(b), 'image/jpeg', PHOTOS.quality);
+  });
+  return { blob: jpeg ?? blob, width: w, height: h };
+}
 
-    this.bindEvents(container);
-    await this.startCamera(container);
-    this.renderComparisonSlider(container, allPhotos);
-  },
+function loadViaImg(source) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('Could not read that image.'));
+    img.src = source instanceof Blob ? URL.createObjectURL(source) : source;
+  });
+}
 
-  async startCamera(container) {
-    if (this.stream) this.stream.getTracks().forEach(t => t.stop());
-    const video = container.querySelector('#cameraFeed');
-    if (!video) return;
-    try {
-      this.stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: this.facingMode, width: { ideal: 1920 }, height: { ideal: 1080 } },
-        audio: false
-      });
-      video.srcObject = this.stream;
-    } catch (err) {}
-  },
+/* ---------------------------------------------------------------- store --- */
 
-  bindEvents(container) {
-    const snapBtn = container.querySelector('#snapPhotoBtn');
-    const toggleBtn = container.querySelector('#toggleCameraFacingBtn');
-    const slider = container.querySelector('#ghostOpacitySlider');
-    const ghostImg = container.querySelector('#ghostOverlayImg');
-    const ghostPct = container.querySelector('#ghostPctLabel');
+async function storePhoto({ blob, width, height, pose, note }) {
+  const at = Date.now();
+  const created = await Photos.create({
+    at, dateKey: dateKeyOf(at), pose, note: note || null,
+    width, height, bytes: blob.size, format: blob.type,
+  });
+  const photoId = created.id ?? created;
 
-    if (slider && ghostImg) {
-      slider.oninput = (e) => {
-        this.ghostOpacity = e.target.value;
-        ghostImg.style.opacity = this.ghostOpacity;
-        if (ghostPct) ghostPct.innerText = `${Math.round(this.ghostOpacity * 100)}%`;
-      };
-    }
+  await PhotoBlobs.put(photoId, blob);
 
-    if (toggleBtn) {
-      toggleBtn.onclick = async () => {
-        this.facingMode = this.facingMode === 'user' ? 'environment' : 'user';
-        await this.startCamera(container);
-      };
-    }
-
-    if (snapBtn) snapBtn.onclick = () => this.capturePhoto(container);
-  },
-
-  async capturePhoto(container) {
-    const video = container.querySelector('#cameraFeed');
-    const canvas = container.querySelector('#photoCaptureCanvas');
-    if (!video || !canvas) return;
-
-    if (navigator.vibrate) navigator.vibrate([40, 30, 40]);
-    canvas.width = video.videoWidth || 1080;
-    canvas.height = video.videoHeight || 1440;
-    const ctx = canvas.getContext('2d');
-    if (this.facingMode === 'user') {
-      ctx.translate(canvas.width, 0);
-      ctx.scale(-1, 1);
-    }
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const compressedWebP = canvas.toDataURL('image/webp', 0.85);
-    const count = await db.progressPhotos.count().catch(() => 0);
-
-    await db.progressPhotos.add({
-      date: new Date().toISOString(),
-      timestamp: Date.now(),
-      dataUrl: compressedWebP,
-      isBaseline: count === 0
-    });
-
-    this.render(container);
-  },
-
-  renderComparisonSlider(container, photos) {
-    const compBox = container.querySelector('#comparisonContainer');
-    if (!compBox || photos.length < 2) return;
-    const first = photos[0];
-    const latest = photos[photos.length - 1];
-
-    compBox.innerHTML = `
-      <div class="glass-card rounded-3xl p-4 space-y-3">
-        <span class="text-[10px] font-mono tracking-widest text-[#00F59B] uppercase">DAY 1 VS CURRENT SLIDER</span>
-        <div class="relative w-full aspect-[3/4] rounded-2xl overflow-hidden select-none border border-white/10" id="splitSliderBox">
-          <img src="${latest.dataUrl}" class="absolute inset-0 w-full h-full object-cover">
-          <div id="splitClipper" class="absolute inset-y-0 left-0 overflow-hidden" style="width: 50%;">
-            <img src="${first.dataUrl}" class="absolute inset-0 w-full h-full object-cover max-w-none" style="width: 100%;">
-          </div>
-          <div id="splitDivider" class="absolute inset-y-0 w-0.5 bg-[#00F59B]" style="left: 50%;">
-            <div class="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-6 h-6 rounded-full bg-[#00F59B] text-black text-[10px] font-black flex items-center justify-center shadow-lg">↔</div>
-          </div>
-        </div>
-      </div>
-    `;
-
-    const box = compBox.querySelector('#splitSliderBox');
-    const clipper = compBox.querySelector('#splitClipper');
-    const divider = compBox.querySelector('#splitDivider');
-
-    const updateSplit = (clientX) => {
-      const rect = box.getBoundingClientRect();
-      let pos = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
-      clipper.style.width = `${pos}%`;
-      divider.style.left = `${pos}%`;
-    };
-
-    box.onpointermove = (e) => { if (e.buttons === 1) updateSplit(e.clientX); };
-    box.onpointerdown = (e) => updateSplit(e.clientX);
+  /* Read it straight back. Safari has shipped versions where a Blob write to
+     IndexedDB succeeded and returned an unreadable blob; failing loudly here is
+     far better than discovering it when the photo is needed. */
+  const check = await PhotoBlobs.get(photoId);
+  if (!check?.blob || !(check.blob.size > 0)) {
+    await Photos.remove(photoId);
+    await PhotoBlobs.remove(photoId);
+    throw new Error('The image could not be stored reliably in this browser. Nothing was saved.');
   }
-};
+
+  return photoId;
+}
+
+/* -------------------------------------------------------------- capture --- */
+
+async function openCapture(previousBlob) {
+  const cameraOk = !!navigator.mediaDevices?.getUserMedia;
+  const video = el('video', { class: 'viewfinder-video', playsinline: true, muted: true, autoplay: true });
+  const ghost = previousBlob
+    ? el('img', {
+        class: 'ghost', alt: '',
+        src: URL.createObjectURL(previousBlob),
+        style: { opacity: String(PHOTOS.ghostOpacity) },
+      })
+    : null;
+  const fileInput = el('input', {
+    class: 'input', type: 'file', accept: 'image/*', capture: 'environment',
+  });
+  const poseSel = el('select', { class: 'input' },
+    ...PHOTOS.poses.map((p) => el('option', { value: p }, p)));
+  const note = el('input', { class: 'input', placeholder: 'optional note' });
+  const status = el('p', { class: 'muted-sm' });
+
+  let stream = null;
+  let pendingBlob = null;
+
+  const viewfinder = el('div', { class: 'viewfinder' }, video, ghost);
+
+  const cleanup = () => {
+    stream?.getTracks().forEach((t) => t.stop());
+    stream = null;
+    if (ghost?.src) URL.revokeObjectURL(ghost.src);
+  };
+
+  const ref = sheet({
+    title: 'Progress photo',
+    body: el('div', {},
+      cameraOk ? viewfinder : null,
+      cameraOk ? el('button', {
+        class: 'btn btn-primary',
+        onclick: async () => {
+          try {
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            const raw = await new Promise((r) => canvas.toBlob(r, 'image/png'));
+            const processed = await processImage(raw);
+            pendingBlob = processed;
+            status.textContent = `Captured · ${Math.round(processed.blob.size / 1024)} KB`;
+          } catch (err) {
+            status.textContent = err?.message ?? 'Capture failed.';
+          }
+        },
+      }, 'Capture') : null,
+      el('p', { class: 'muted-sm' },
+        cameraOk
+          ? 'Or choose an existing photo:'
+          : 'Live camera is unavailable here. Choose a photo from your library:'),
+      field('Photo file', fileInput),
+      ghost ? el('p', { class: 'muted-sm' },
+        'Your previous photo is overlaid faintly. Line up the same distance and angle — ' +
+        'otherwise the difference between photos is mostly camera position.') : null,
+      field('Pose', poseSel),
+      field('Note', note),
+      status,
+    ),
+    confirmLabel: 'Save photo',
+    onClose: cleanup,
+    onConfirm: async () => {
+      let payload = pendingBlob;
+      if (!payload && fileInput.files?.[0]) {
+        try { payload = await processImage(fileInput.files[0]); }
+        catch (err) { toast(err?.message ?? 'Could not read that image.'); return false; }
+      }
+      if (!payload) { toast('Capture or choose a photo first.'); return false; }
+
+      await storePhoto({ ...payload, pose: poseSel.value, note: note.value.trim() });
+      toast('Photo saved on this device.');
+      refresh();
+      return true;
+    },
+  });
+
+  if (cameraOk) {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 1280 } }, audio: false,
+      });
+      video.srcObject = stream;
+    } catch {
+      status.textContent = 'Camera permission denied — use the file picker instead.';
+      viewfinder.remove();
+    }
+  }
+
+  return ref;
+}
+
+/* ----------------------------------------------------------------- grid --- */
+
+async function photoGrid(photos) {
+  const grid = el('div', { class: 'photo-grid' });
+  const urls = [];
+
+  for (const p of photos) {
+    const rec = await PhotoBlobs.get(p.id);
+    if (!rec?.blob) {
+      grid.append(el('div', { class: 'photo-cell' },
+        el('figcaption', {}, 'image missing')));
+      continue;
+    }
+    const url = URL.createObjectURL(rec.blob);
+    urls.push(url);
+    grid.append(el('button', {
+      class: 'photo-cell',
+      onclick: () => openPhoto(p, rec.blob),
+      'aria-label': `${p.pose} photo from ${p.dateKey}`,
+    },
+      el('img', { src: url, alt: '', loading: 'lazy' }),
+      el('figcaption', {}, `${p.dateKey.slice(5)} · ${p.pose}`),
+    ));
+  }
+
+  /* Object URLs are a real leak if never revoked. Released when the grid leaves
+     the document, checked on a slow interval that stops itself. */
+  const watcher = setInterval(() => {
+    if (!grid.isConnected) {
+      urls.forEach((u) => URL.revokeObjectURL(u));
+      clearInterval(watcher);
+    }
+  }, 5000);
+
+  return grid;
+}
+
+function openPhoto(photo, blob) {
+  const url = URL.createObjectURL(blob);
+  sheet({
+    title: `${photo.pose} · ${fmt.dayLabel(photo.dateKey)}`,
+    body: el('div', {},
+      el('img', { class: 'photo-full', src: url, alt: `${photo.pose} photo` }),
+      photo.note ? el('p', { class: 'muted-sm' }, photo.note) : null,
+      el('p', { class: 'muted-sm' },
+        `${photo.width}×${photo.height} · ${Math.round((photo.bytes ?? 0) / 1024)} KB · stored on this device only`),
+    ),
+    onClose: () => URL.revokeObjectURL(url),
+    footer: el('button', {
+      class: 'btn btn-danger btn-sm',
+      onclick: () => confirmDestructive({
+        title: 'Delete this photo?',
+        message: 'The image is removed from this device. This cannot be undone.',
+        confirmLabel: 'Delete photo',
+        onConfirm: async () => {
+          await Photos.remove(photo.id);
+          await PhotoBlobs.remove(photo.id);
+          toast('Photo deleted.');
+          refresh();
+        },
+      }),
+    }, 'Delete'),
+  });
+}
+
+/* ------------------------------------------------------------ timelapse --- */
+
+async function openTimelapse(photos) {
+  const ordered = [...photos].sort((a, b) => a.at - b.at);
+  if (ordered.length < 2) { toast('Two photos of the same pose are needed.'); return; }
+
+  const img = el('img', { class: 'photo-full', alt: 'Timelapse frame' });
+  const label = el('p', { class: 'muted-sm' });
+  const urls = [];
+  let i = 0, timer = null;
+
+  for (const p of ordered) {
+    const rec = await PhotoBlobs.get(p.id);
+    urls.push(rec?.blob ? URL.createObjectURL(rec.blob) : null);
+  }
+
+  const show = (idx) => {
+    const url = urls[idx];
+    if (url) img.src = url;
+    label.textContent = `${idx + 1} of ${ordered.length} · ${ordered[idx].dateKey}`;
+  };
+
+  const play = () => {
+    if (timer) { clearInterval(timer); timer = null; return; }
+    timer = setInterval(() => {
+      i = (i + 1) % ordered.length;
+      show(i);
+    }, PHOTOS.timelapseFrameMs);
+  };
+
+  show(0);
+
+  sheet({
+    title: 'Timelapse',
+    body: el('div', {}, img, label,
+      el('div', { class: 'row-actions' },
+        el('button', { class: 'btn', onclick: play }, 'Play / pause'),
+        el('button', { class: 'btn btn-ghost', onclick: () => { i = Math.max(0, i - 1); show(i); } }, '‹'),
+        el('button', { class: 'btn btn-ghost', onclick: () => { i = Math.min(ordered.length - 1, i + 1); show(i); } }, '›'),
+      )),
+    onClose: () => {
+      if (timer) clearInterval(timer);
+      urls.forEach((u) => u && URL.revokeObjectURL(u));
+    },
+  });
+}
+
+/* ---------------------------------------------------------------- view --- */
+
+export async function photosView({ params } = {}) {
+  if (!FEATURES.photos) {
+    return card('Photos are switched off', {},
+      el('p', { class: 'muted-sm' }, 'FEATURES.photos is false in src/config/app.config.js.'));
+  }
+
+  const pose = params?.get?.('pose') ?? null;
+  const all = await db().photos.orderBy('at').reverse().filter((p) => !p.deletedAt).toArray();
+  const shown = pose ? all.filter((p) => p.pose === pose) : all;
+
+  const bytes = await PhotoBlobs.totalBytes();
+  const mb = bytes / (1024 * 1024);
+
+  const latestSamePose = pose
+    ? all.find((p) => p.pose === pose)
+    : all[0];
+  const ghostRec = latestSamePose ? await PhotoBlobs.get(latestSamePose.id) : null;
+
+  const poseFilter = el('div', { class: 'chip-row' },
+    el('a', { class: 'chip chip-btn', href: '#/photos', dataset: { on: String(!pose) } }, 'all'),
+    ...PHOTOS.poses.map((p) => el('a', {
+      class: 'chip chip-btn', href: `#/photos?pose=${p}`, dataset: { on: String(pose === p) },
+    }, p)),
+  );
+
+  return el('div', { class: 'stack' },
+    card('Progress photos', {
+      note: `${all.length} photo${all.length === 1 ? '' : 's'} · ${mb.toFixed(1)} MB`,
+      actions: el('button', {
+        class: 'btn btn-sm btn-primary',
+        onclick: () => openCapture(ghostRec?.blob ?? null),
+      }, 'Add'),
+    },
+      poseFilter,
+      shown.length ? await photoGrid(shown.slice(0, 60)) : null,
+      shown.length >= 2 ? el('button', {
+        class: 'btn btn-sm',
+        onclick: () => openTimelapse(shown),
+      }, 'Play timelapse') : null,
+      mb > PHOTOS.warnAtMb
+        ? callout(`Photos are using ${mb.toFixed(0)} MB. Browsers evict storage when space runs short — ` +
+                  'export a backup, or delete some older shots.', { tone: 'alert' })
+        : null,
+      callout('Photos never leave this device. There is no upload and no account. ' +
+              'That also means a browser data wipe removes them permanently, so keep a backup ' +
+              'of anything you would be upset to lose.', { tone: 'recovery' }),
+    ),
+    !all.length ? emptyState({
+      title: 'No photos yet',
+      message: 'A monthly photo in consistent lighting tells you far more than the scale does. ' +
+               'The camera overlays your last shot so you can match the angle.',
+    }) : null,
+  );
+}

@@ -1,36 +1,69 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-motion="auto" data-contrast="normal" data-text="normal">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>NoMeh! — Elite Offline Fitness</title>
-  <link rel="manifest" href="manifest.webmanifest">
-  <meta name="theme-color" content="#02050A">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>NoMeh!</title>
+<meta name="description" content="A private, offline-first personal performance app. Your data stays on your device.">
+<meta name="theme-color" content="#050507">
+<meta name="color-scheme" content="dark">
 
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Syne:wght@700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<!-- iOS standalone hints. Note: iOS ignores the manifest's display mode, so these matter. -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="NoMeh!">
 
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <link rel="stylesheet" href="styles/tokens.css">
-  <link rel="stylesheet" href="styles/app.css">
+<!-- All paths are relative so the app works from https://user.github.io/REPO/ -->
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./assets/icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./assets/icons/icon-192.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Outfit:wght@400;500;600;700&display=swap">
+
+<link rel="stylesheet" href="./styles/tokens.css">
+<link rel="stylesheet" href="./styles/app.css">
 </head>
-<body class="bg-[#02050A] text-slate-100 min-h-screen font-outfit antialiased overflow-x-hidden selection:bg-[#00F59B] selection:text-black">
-  <div id="appShell" class="w-full max-w-md mx-auto min-h-screen flex flex-col relative pb-28">
-    <header class="sticky top-0 z-40 bg-[#02050A]/90 backdrop-blur-xl border-b border-white/5 px-5 py-4 flex justify-between items-center">
-      <div class="flex items-center gap-2">
-        <div class="w-2.5 h-2.5 rounded-full bg-[#00F59B] shadow-[0_0_12px_#00F59B]"></div>
-        <span class="font-syne font-black text-xl tracking-tight text-white">NoMeh<span class="text-[#00F59B]">!</span></span>
-      </div>
-      <button id="profileHeaderTrigger" class="w-9 h-9 rounded-full bg-[#080E18] border border-white/10 flex items-center justify-center active:scale-95 transition-all text-xs font-syne font-black text-slate-300">
-        N
-      </button>
-    </header>
-    <main id="app" class="flex-1 w-full px-4 pt-4"></main>
+<body>
+
+<a class="skip" href="#main">Skip to main content</a>
+
+<div class="shell">
+  <header class="topbar">
+    <span class="brand">NoMeh<em>!</em></span>
+    <div class="topbar-meta">
+      <span class="net" id="net" data-state="online" title="Network status">
+        <span class="dot" aria-hidden="true"></span>
+        <span id="net-label">Online</span>
+      </span>
+    </div>
+  </header>
+
+  <main id="main" tabindex="-1">
+    <!-- Router renders here. Replaced on every navigation. -->
+    <div class="boot" id="view">
+      <p class="eyebrow">Starting</p>
+      <p style="color:var(--text-dim)">Opening your local database…</p>
+    </div>
+  </main>
+</div>
+
+<!-- The dock is generated at boot by buildDock() in src/main.js from UI.nav in
+     src/config/app.config.js, so disabling a feature genuinely removes its tab.
+     Kept empty here rather than duplicated, so there is one source of truth. -->
+<nav class="dock" id="dock" aria-label="Main"></nav>
+
+<div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+
+<noscript>
+  <div style="padding:24px;max-width:520px;margin:0 auto;color:#f2f4f7;font-family:system-ui">
+    <h1>JavaScript is required</h1>
+    <p>NoMeh! runs entirely in your browser — the calculations, the database, and the
+    offline support are all client-side. There is no server to fall back to.</p>
   </div>
-  <script type="module" src="src/main.js"></script>
+</noscript>
+
+<script type="module" src="./src/main.js"></script>
 </body>
 </html>
