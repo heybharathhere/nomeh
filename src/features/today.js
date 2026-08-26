@@ -33,16 +33,18 @@ export async function todayView() {
   const host = el('div', { class: 'stack' });
 
   host.append(
-    el('p', { class: 'eyebrow' }, greeting()),
-    el('h1', { class: 'page-title', style: { marginBottom: 'var(--s4)' } },
-      profile?.name ? `${profile.name}, here's today` : "Here's today"),
-    headline(totals, targets, streak),
-    fuel(totals, targets),
-    movement(totals),
-    readiness(todayLogs, recent),
-    weightTrend(recent, profile),
-    todayLog(todayLogs, clock),
-    quickLinks()
+    ...[
+      el('p', { class: 'eyebrow' }, greeting()),
+      el('h1', { class: 'page-title', style: { marginBottom: 'var(--s4)' } },
+        profile?.name ? `${profile.name}, here's today` : "Here's today"),
+      headline(totals, targets, streak),
+      fuel(totals, targets),
+      movement(totals),
+      readiness(todayLogs, recent),
+      weightTrend(recent, profile),
+      todayLog(todayLogs, clock),
+      quickLinks()
+    ].filter(Boolean)
   );
 
   return host;
