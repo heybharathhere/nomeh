@@ -12,7 +12,7 @@ import { db, getSetting } from '../../db/database.js';
 import { computeTargets } from '../../engines/biomath.js';
 import { portion, sumNutrients, groupByMeal, macroSplit, targetStatus, macroSanity } from '../../engines/nutrition.js';
 import { localSearch, recent, remoteSearch, remoteBarcode, saveFood, touchFood,
-         barcodeSupported, scanBarcode, remoteAvailable } from './foods.js';
+         barcodeSupported, scanBarcode, remoteAvailable } from '../../features/foods.js';
 import { NUTRITION, FEATURES, SAFETY } from '../../config/app.config.js';
 import { refresh } from '../../core/router.js';
 

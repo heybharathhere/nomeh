@@ -180,9 +180,29 @@ export async function openDatabase() {
     window.dispatchEvent(new CustomEvent('nomeh:db-superseded'));
   });
 
-  await db.open();
+  await openWithTimeout(db);
   dbInstance = db;
   return db;
+}
+
+/* db.open() has no built-in timeout. If another tab (or another instance of
+   this PWA, foreground or background) is holding an older schema version
+   open, IndexedDB fires 'blocked' and the open call just waits — forever,
+   with nothing on screen but "Opening your local database...". That is a
+   real failure mode on a phone where old tabs pile up, not a hypothetical
+   one, so it gets a specific, actionable error instead of an infinite wait. */
+function openWithTimeout(db, ms = 6000) {
+  let blocked = false;
+  db.on('blocked', () => { blocked = true; });
+
+  const opening = db.open();
+  const timeout = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error(blocked
+      ? 'Another open tab of NoMeh! is holding an older version of the database. Close every other NoMeh! tab — including ones in the background — then reload.'
+      : 'The database took too long to respond.')), ms);
+  });
+
+  return Promise.race([opening, timeout]);
 }
 
 export function db() {
