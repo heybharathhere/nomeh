@@ -18,7 +18,7 @@ import { installSeeds } from './db/seeds.js';
 import { UI, FEATURES, enabled } from './config/app.config.js';
 
 import { onboardingView } from './features/onboarding.js';
-import { todayView } from './features/today.js';
+import { todayView } from './tabs/nomeh/view.js';
 import { logView } from './features/log.js';
 import { timelineView } from './features/timeline.js';
 import { bodyView } from './features/body.js';
