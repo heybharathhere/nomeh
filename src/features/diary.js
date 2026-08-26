@@ -7,7 +7,7 @@
  */
 
 import { el, card, callout, fmt, colourVar, metricBar, emptyState, sheet, field, toast, clear, roadmapCard } from '../core/ui.js';
-import { Profile, Meals, Hydration, dateKeyOf, dateKeyOffset } from '../db/repos.js';
+import { Profile, Meals, Hydration, Logs, dateKeyOf, dateKeyOffset } from '../db/repos.js';
 import { db, getSetting } from '../db/database.js';
 import { computeTargets } from '../engines/biomath.js';
 import { portion, sumNutrients, groupByMeal, macroSplit, targetStatus, macroSanity } from '../engines/nutrition.js';
@@ -305,6 +305,11 @@ function openPortion({ food, dateKey, slot, onChange, fromRemote = false }) {
         ...p,
         at: Date.now(),
       });
+      /* Also written to the shared Logs table — this is what makes it show
+         up on the NoMeh tab, streak, and Analytics, same as every other
+         log type. mealItems stays the source of truth for the diary's own
+         meal breakdown; this is just the universal-feed copy. */
+      await Logs.create({ type: 'food', value: p.kcal, label: stored.name, dateKey, at: Date.now() });
       toast(`${stored.name} · ${p.kcal} kcal`);
       onChange();
       return true;
@@ -418,6 +423,8 @@ function openScanner({ dateKey, slot, onChange }) {
 function hydrationCard(waterMl, target, dateKey, onChange) {
   const add = async (ml) => {
     await Hydration.create({ ml, kind: 'water', dateKey, at: Date.now() });
+    /* Same universal-feed copy as food, above. */
+    await Logs.create({ type: 'water', value: ml, dateKey, at: Date.now() });
     toast(`+${ml} ml`);
     onChange();
   };
