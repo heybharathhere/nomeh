@@ -10,7 +10,7 @@
 
 import { el, card, fmt, tint, colourVar, emptyState, sheet, field, toast, clear, roadmapCard } from '../core/ui.js';
 import { db, getSetting, setSetting } from '../db/database.js';
-import { Workouts, WorkoutSets, Exercises, PRs, dateKeyOf } from '../db/repos.js';
+import { Workouts, WorkoutSets, Exercises, PRs, Logs, dateKeyOf } from '../db/repos.js';
 import { oneRepMaxRange, volumeLoad, detectPRs, suggestProgression,
          sessionLoad, setKind, restFor } from '../engines/training.js';
 import { FEATURES, TRAINING, enabled } from '../config/app.config.js';
@@ -66,6 +66,22 @@ async function finishWorkout(id) {
       ...(existing ?? {}), dateKey,
       load: (existing?.load ?? 0) + load,
       sessions: (existing?.sessions ?? 0) + 1,
+    });
+  }
+
+  /* Same universal-feed copy pattern as Nutrition — one summary log so the
+     session shows up on NoMeh/streak/Analytics without duplicating every
+     individual set. Totals are back-computed from the real sets so
+     sets × reps × loadKg reproduces the actual volume, not an approximation. */
+  if (sets.length > 0) {
+    const totalReps = sets.reduce((sum, s) => sum + (Number(s.reps) || 0), 0);
+    const totalVolumeKg = volumeLoad(sets);
+    const avgReps = totalReps / sets.length;
+    const avgLoadKg = totalReps > 0 ? totalVolumeKg / totalReps : 0;
+    const dateKey = workout?.dateKey ?? dateKeyOf(endedAt);
+    await Logs.create({
+      type: 'exercise', exercise: 'Workout', sets: sets.length, reps: avgReps, loadKg: avgLoadKg,
+      dateKey, at: endedAt,
     });
   }
 

@@ -22,7 +22,7 @@
 
 import { el, card, callout, fmt, tint, colourVar, emptyState, sheet, field, toast, clear, roadmapCard } from '../core/ui.js';
 import { db, getSetting, setSetting } from '../db/database.js';
-import { Activities, RoutePoints, dateKeyOf } from '../db/repos.js';
+import { Activities, RoutePoints, Logs, dateKeyOf } from '../db/repos.js';
 import { acceptPoint, processTrack, splits, paceSecPerKm, speedKmh,
          movingTime, routePath, parseGpx, buildGpx, estimatePower } from '../engines/geo.js';
 import { capabilities } from '../core/capabilities.js';
@@ -357,6 +357,21 @@ async function finishActivity(activity) {
 
   if (lapList.length) {
     await db().laps.bulkAdd(lapList.map((l) => ({ ...l, activityId: activity.id })));
+  }
+
+  /* Same universal-feed copy as Nutrition and Workout — one summary entry so
+     the run/ride shows up on NoMeh/streak/Analytics. dailyTotals only knows
+     run/walk/cycle; hike counts as a walk there since there is no separate
+     bucket for it. */
+  if (processed.distanceM > 0) {
+    const logType = activity.sport === 'hike' ? 'walk' : (activity.sport === 'cycle' ? 'cycle' : (activity.sport === 'run' ? 'run' : 'walk'));
+    await Logs.create({
+      type: logType,
+      value: Math.round((processed.distanceM / 1000) * 100) / 100,
+      minutes: Math.round(timing.movingS / 60),
+      dateKey: activity.dateKey,
+      at: Date.now(),
+    });
   }
 
   await setSetting(ACTIVE_KEY, null);
