@@ -7,7 +7,7 @@
  */
 
 import { el, card, callout, fmt, colourVar, metricBar, emptyState, sheet, field, toast, clear, roadmapCard } from '../core/ui.js';
-import { Profile, Meals, Hydration, Logs, dateKeyOf, dateKeyOffset } from '../db/repos.js';
+import { Profile, Meals, Logs, dateKeyOf, dateKeyOffset } from '../db/repos.js';
 import { db, getSetting } from '../db/database.js';
 import { computeTargets } from '../engines/biomath.js';
 import { portion, sumNutrients, groupByMeal, macroSplit, targetStatus, macroSanity } from '../engines/nutrition.js';
@@ -422,8 +422,9 @@ function openScanner({ dateKey, slot, onChange }) {
 
 function hydrationCard(waterMl, target, dateKey, onChange) {
   const add = async (ml) => {
-    await Hydration.create({ ml, kind: 'water', dateKey, at: Date.now() });
-    /* Same universal-feed copy as food, above. */
+    /* Single-sourced: this only writes to `logs`. loadDay() above already
+       unions logs(type=water) with the legacy `hydration` table, so writing
+       to both here would double-count today's total. */
     await Logs.create({ type: 'water', value: ml, dateKey, at: Date.now() });
     toast(`+${ml} ml`);
     onChange();

@@ -10,10 +10,12 @@
  */
 
 import { el, field, card, sheet, toast, tint, fmt, emptyState, clear } from '../core/ui.js';
-import { Logs } from '../db/repos.js';
+import { Logs, dateKeyOf } from '../db/repos.js';
 import { getSetting, setSetting } from '../db/database.js';
 import { parseQuickLog, candidateToRecord, LOG_TYPES } from '../engines/logparser.js';
 import { refresh } from '../core/router.js';
+import { openFoodPicker } from './diary.js';
+import { NUTRITION } from '../config/app.config.js';
 
 /* Type ordering is contextual. Full session awareness ("you are 20 minutes into
    a workout, show sets first") arrives with the workout and outdoor engines;
@@ -254,7 +256,27 @@ const NUMERIC = {
 
 const SCALES = ['mood', 'energy', 'stress', 'soreness'];
 
+/* Same meal windows Nutrition uses (config/app.config.js NUTRITION.meals) —
+   so "food" logged from Quick Log lands in the meal slot Nutrition would
+   have put it in anyway, not a separate "quick" bucket only this tab knows. */
+function currentMealSlot() {
+  const h = new Date().getHours();
+  const hit = NUTRITION.meals.find((m) => m.from < m.to ? (h >= m.from && h < m.to) : (h >= m.from || h < m.to));
+  return hit?.key ?? 'snack';
+}
+
 function openForm(type, existing = null) {
+  /* Food is not a bare number — it is the same food-database entry Nutrition
+     uses (search, portion, macros), reached through the exact same function.
+     One code path writes food, called from two tabs; that is what makes the
+     entry actually show up correctly in both, rather than a copy of it. New
+     entries only — editing an existing quick-logged figure keeps the plain
+     number field below, since old entries may have no linked food. */
+  if (type === 'food' && !existing) {
+    openFoodPicker({ dateKey: dateKeyOf(), slot: currentMealSlot(), onChange: refresh });
+    return;
+  }
+
   const meta = LOG_TYPES[type];
   const body = el('div', { class: 'stack' });
   const state = { at: existing?.at ?? Date.now() };
