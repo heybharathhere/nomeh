@@ -414,6 +414,21 @@ button, input, select, textarea { font: inherit; color: inherit; }
    glow on the active tab carries that meaning instead. aria-label keeps it
    readable to assistive tech. */
 .dock a svg {
+  width: 20px;
+  height: 20px;
+  transition:
+    transform var(--dur-2) var(--ease),
+    filter var(--dur-2) var(--ease);
+}
+.dock a[aria-current="page"] {
+  color: var(--emerald);
+}
+.dock a[aria-current="page"] svg {
+  transform: scale(1.3);
+  filter: drop-shadow(0 0 6px rgba(16,224,140,.35));
+}
+/*
+.dock a svg {
   width: 18px; height: 18px;
   transition: width var(--dur-2) var(--ease), height var(--dur-2) var(--ease),
               filter var(--dur-2) var(--ease);
@@ -422,13 +437,15 @@ button, input, select, textarea { font: inherit; color: inherit; }
   color: var(--emerald);
 }
 .dock a[aria-current="page"] svg {
-  width: 58px; height: 58px;
-  filter: drop-shadow(0 0 8px rgba(16, 224, 140, .65)) drop-shadow(0 0 20px rgba(16, 224, 140, .4));
+  width: 30px; height: 30px;
+  filter: drop-shadow(0 0 6px rgba(16, 224, 140, .65)) drop-shadow(0 0 15px rgba(16, 224, 140, .4));
 }
+  */
 
 /* The LOG action sits in the dock centre and is the app's primary verb —
    still magnifies/lifts like the others when active, but keeps its filled
    emerald treatment so it reads as the one-tap action even at rest. */
+/*
 .dock .log-action {
   color: #04130c;
   background: var(--emerald);
@@ -444,7 +461,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   width: 26px; height: 26px;
   filter: none;
 }
-
+*/
 /* ---------- Sheet ---------- */
 
 .sheet-scrim {
